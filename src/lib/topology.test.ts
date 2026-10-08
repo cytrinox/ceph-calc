@@ -111,7 +111,7 @@ describe('topology', () => {
   })
 
   it('provides valid example topologies', () => {
-    expect(TOPOLOGY_EXAMPLES).toHaveLength(8)
+    expect(TOPOLOGY_EXAMPLES).toHaveLength(9)
     for (const ex of TOPOLOGY_EXAMPLES) {
       const t = ex.build()
       expect(topologyStats(t).rawTB).toBeGreaterThan(0)
@@ -130,6 +130,17 @@ describe('topology', () => {
       expect(ex.recoveryReserve, ex.id).toBeGreaterThanOrEqual(1)
     }
     expect(topologyStats(example('chassis')).counts).toMatchObject({ rack: 2, chassis: 6, host: 24 })
+    // Same numbers as the FAQ's mixed-size example.
+    const unbalanced = TOPOLOGY_EXAMPLES.find((e) => e.id === 'unbalanced-hosts')!
+    const r = computeCapacity(failureDomains(unbalanced.build(), 'host'), unbalanced.scheme, {
+      fullRatio: DEFAULT_RATIOS.full,
+      backfillfullRatio: DEFAULT_RATIOS.backfillfull,
+      nearfullRatio: DEFAULT_RATIOS.nearfull,
+      recoveryReserve: unbalanced.recoveryReserve,
+    })
+    expect(r.usableTB).toBeCloseTo(8.5, 9)
+    expect(r.unusable.strandedTB).toBeCloseTo(5, 9)
+    expect(r.reserved.recoveryReserveTB).toBeCloseTo(15, 9)
   })
 
   it('starts a first visit with replication 3x and no recovery reserve', () => {

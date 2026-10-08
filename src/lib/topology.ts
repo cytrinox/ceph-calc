@@ -426,6 +426,15 @@ export const TOPOLOGY_EXAMPLES: TopologyExample[] = [
     build: () => [host('gen1-host01', 3, [[12, 8]]), host('gen2-host01', 2, [[12, 16]])],
   },
   {
+    // The big host can hold at most a third of all copies: 5 TB of it can never be filled.
+    id: 'unbalanced-hosts',
+    label: 'Unbalanced hosts · 3 × 10 TB + 1 × 20 TB',
+    domain: 'host',
+    scheme: REP3,
+    recoveryReserve: 1,
+    build: () => [host('host01', 3, [[1, 10]]), host('big-host01', 1, [[1, 20]])],
+  },
+  {
     id: 'racks',
     label: 'Rack-aware · 5 racks × 4 hosts × 12 × 16 TB',
     domain: 'rack',
