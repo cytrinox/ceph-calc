@@ -1,7 +1,8 @@
 # The ceph real net capacity calculator
 
-A Vue 3 web tool that calculates **usable capacity, protection overhead, reserved margins, efficiency,
-tolerated failures and minimum failure domains** for a Ceph pool on a given topology.
+A Vue 3 web tool that calculates the **real net capacity** of a Ceph pool on a given topology: the data you
+can store while every OSD stays below the nearfull ratio, even after recovering from failures. It also shows
+**protection overhead, reserved margins, efficiency, tolerated failures and minimum failure domains**.
 
 Source: <https://github.com/cytrinox/ceph-calc>
 
@@ -11,16 +12,20 @@ Source: <https://github.com/cytrinox/ceph-calc>
   Every bucket has a `×N` multiplier for identical copies plus duplicate/split/remove actions, and
   hosts contain one or more OSD groups (`count × size`). Any bucket type can be the failure domain.
 - Price: price per TB of raw drive capacity (default 500) with a free-text currency (`EUR`, `$`, `USD`, …);
-  the Net capacity card shows the cluster's drive cost and the cost per usable TB.
+  the Real net capacity card shows the cluster's drive cost and the cost per usable TB.
 - Pool schemes: replication (`size`, `min_size`) or erasure coding (`k`, `m`), with common presets.
 - Headroom: recovery reserve (free space to recover the data of N failed failure domains, capped at the
   spare domains = domains − copies/shards per object) and the nearfull (0.85), backfillfull (0.90) and full
   (0.95) ratios.
 - Pool configuration: pool name, application, CRUSH rule name, device class, EC profile and plugin,
   EC `technique` and `stripe_unit`, `allow_ec_overwrites`, `fast_read`, PG autoscaling, `pg_num` (with a
-  suggested value), `bulk`, `target_size_ratio` / `target_size_bytes`,
-  compression (with an expected compression ratio, default 0.90, shown as an effective-capacity badge), quotas, and the `nodelete` / `nosizechange` flags. Leave the rule or profile name empty to get a
-  derived name such as `rep3_host` or `ec-4-2-rack-nvme`.
+  suggested value), `bulk`, `target_size_ratio` / `target_size_bytes`, compression (with an expected
+  compression ratio, default 0.90, shown as an effective-capacity badge), quotas, and the `nodelete` /
+  `nosizechange` flags. Leave the rule or profile name empty to get a derived name such as `rep3_host`
+  or `ec-4-2-rack-nvme`.
+- Raw data distribution bar: usable, protection and reserved margins, with markers where a healthy cluster
+  reaches the nearfull, backfillfull and full ratios. Below the usable share, `+X until backfillfull` /
+  `+X until full` shows how much more data fits before those limits.
 - Comparison table of all presets on the current topology, plus a chart: usable capacity as a line (TB on the
   left axis, efficiency as % of raw on the right; both are the same series since raw is shared) over stacked bars
   of survives / needs, with the available failure domains as a dashed line. Click a row or column to select it.
@@ -31,6 +36,10 @@ Source: <https://github.com/cytrinox/ceph-calc>
   the **Share** button copies that link (or opens the native share sheet on phones).
 - **TB / TiB** switch for all results (bar, tables, chart, warnings). Inputs such as OSD sizes stay in decimal TB,
   as drives are sold that way; TiB matches what `ceph df` reports.
+- FAQ panel: why the real net capacity is lower than on other calculators (with the formula and worked
+  examples) and what the recovery reserve is for. The **?** buttons next to the Real net capacity heading
+  and the recovery reserve field jump to the matching answer.
+- The site is marked **beta** in the title; a footer disclaimer notes that all results are estimates.
 
 ## Calculation model
 
