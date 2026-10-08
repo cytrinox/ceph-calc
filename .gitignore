@@ -2,3 +2,8 @@ node_modules/
 dist/
 *.log
 .DS_Store
+
+# Yarn Plug'n'Play (the project uses npm)
+.pnp.*
+.yarn/
+.yarnrc.yml

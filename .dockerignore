@@ -6,3 +6,6 @@ dist
 Containerfile
 .containerignore
 README.md
+.pnp.*
+.yarn
+.yarnrc.yml
