@@ -13,7 +13,7 @@ import TabGroup from './TabGroup.vue'
 import { DEFAULT_RATIOS, ratiosOrdered, schemeMinSize } from '@/lib/ceph'
 import { CUSTOM_EC, CUSTOM_REPLICATED, DEFAULT_PRESET_ID, PRESETS, schemeLabel, schemeSelection } from '@/lib/schemes'
 import { formatInt } from '@/lib/format'
-import { CURRENCY_MAX_LENGTH } from '@/lib/pricing'
+import { CURRENCY_MAX_LENGTH, formatPrice } from '@/lib/pricing'
 import { TYPE_ID, plural, type DomainType } from '@/lib/topology'
 import type { AppState, TopologyTab } from '@/lib/urlState'
 
@@ -81,7 +81,7 @@ const hardwareSummary = computed(() => {
     st.tab === 'basic'
       ? `${formatInt(st.basic.hosts)} hosts × ${st.basic.osdsPerHost} × ${st.basic.osdSizeTB} TB`
       : `custom tree · ${formatInt(props.osdCount)} OSDs`
-  return st.pricePerTB > 0 ? `${topo} · ${st.pricePerTB} ${st.currency}/TB` : topo
+  return st.pricePerTB > 0 ? `${topo} · ${formatPrice(st.pricePerTB, st.currency)}/TB` : topo
 })
 const redundancySummary = computed(() => `${schemeLabel(props.state.scheme)} · across ${plural(domain.value)}`)
 const headroomSummary = computed(() => {
