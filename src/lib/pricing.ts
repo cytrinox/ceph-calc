@@ -2,6 +2,8 @@
 
 export const DEFAULT_PRICE_PER_TB = 500
 export const DEFAULT_CURRENCY = 'EUR'
+/** Longest currency text (input field and shared links). */
+export const CURRENCY_MAX_LENGTH = 6
 
 /** Total drive cost of the cluster. */
 export function clusterPrice(rawTB: number, pricePerTB: number): number {

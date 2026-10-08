@@ -14,7 +14,7 @@ import {
   type PoolOptions,
 } from './pool'
 import { DEFAULT_RATIOS, type Scheme } from './ceph'
-import { DEFAULT_CURRENCY, DEFAULT_PRICE_PER_TB } from './pricing'
+import { CURRENCY_MAX_LENGTH, DEFAULT_CURRENCY, DEFAULT_PRICE_PER_TB } from './pricing'
 import {
   ALL_DOMAIN_TYPES,
   BUCKET_TYPES,
@@ -224,7 +224,7 @@ export function decodeState(data: string): AppState | null {
     state.healDomains = int(p.h)
     state.pool = sanitizePool(p.p)
     if (typeof p.pt === 'number' && Number.isFinite(p.pt)) state.pricePerTB = Math.max(0, p.pt)
-    if (typeof p.cu === 'string') state.currency = p.cu.slice(0, 12)
+    if (typeof p.cu === 'string') state.currency = p.cu.slice(0, CURRENCY_MAX_LENGTH)
     return state
   } catch {
     return null

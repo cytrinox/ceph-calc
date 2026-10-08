@@ -134,6 +134,12 @@ describe('topology', () => {
     expect(decodeState(encodeState(state))!.pricePerTB).toBe(650)
   })
 
+  it('cuts the currency in shared links to the input length', () => {
+    const state = defaultState()
+    state.currency = 'Dollars'
+    expect(decodeState(encodeState(state))!.currency).toBe('Dollar')
+  })
+
   it('keeps ratios of 0 and 1 in shared links', () => {
     const state = defaultState()
     state.nearfullRatio = 0

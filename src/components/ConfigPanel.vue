@@ -13,6 +13,7 @@ import TabGroup from './TabGroup.vue'
 import { DEFAULT_RATIOS, ratiosOrdered, schemeMinSize } from '@/lib/ceph'
 import { CUSTOM_EC, CUSTOM_REPLICATED, DEFAULT_PRESET_ID, PRESETS, schemeLabel, schemeSelection } from '@/lib/schemes'
 import { formatInt } from '@/lib/format'
+import { CURRENCY_MAX_LENGTH } from '@/lib/pricing'
 import { TYPE_ID, plural, type DomainType } from '@/lib/topology'
 import type { AppState, TopologyTab } from '@/lib/urlState'
 
@@ -132,7 +133,7 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
               v-model.trim="state.currency"
               class="currency"
               type="text"
-              maxlength="6"
+              :maxlength="CURRENCY_MAX_LENGTH"
               aria-label="Currency"
               title="Currency: any text, e.g. EUR, $, USD"
               autocomplete="off"
