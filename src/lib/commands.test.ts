@@ -49,7 +49,8 @@ describe('buildCommands', () => {
     )
     expect(s).toContain('ceph osd crush rule create-erasure ec4-2_rack_nvme ec-4-2-rack-nvme')
     expect(s).toContain('erasure ec-4-2-rack-nvme ec4-2_rack_nvme')
-    expect(s).toContain('ceph osd pool set vms min_size 5')
+    expect(s).not.toContain('min_size')
+    expect(s).toContain('# EC options\nceph osd pool set vms allow_ec_overwrites true')
     expect(s).toContain('ceph osd pool set vms allow_ec_overwrites true')
     expect(s).toContain('ceph osd pool set vms fast_read 1')
     expect(s).toContain('--data-pool vms')
@@ -96,9 +97,12 @@ describe('buildCommands', () => {
     expect(s).not.toContain('pool set data size 1\n')
   })
 
-  it('sets min_size k for EC pools with m = 1', () => {
-    const s = script(input({ kind: 'ec', k: 2, m: 1 }))
-    expect(s).toContain('ceph osd pool set data min_size 2')
+  it('leaves min_size of EC pools to Ceph', () => {
+    const pool = { ...defaultPoolOptions(), ecOverwrites: false, fastRead: false }
+    const s = script(input({ kind: 'ec', k: 2, m: 1 }, pool))
+    expect(s).not.toContain('min_size')
+    expect(s).not.toContain('# EC options')
+    expect(s).not.toContain('# Redundancy')
   })
 })
 

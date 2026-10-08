@@ -30,8 +30,9 @@ Source: <https://github.com/cytrinox/ceph-calc>
   left axis, efficiency as % of raw on the right; both are the same series since raw is shared) over stacked bars
   of survives / needs, with the available failure domains as a dashed line. Click a row or column to select it.
 - Ceph commands panel: the full command sequence for the configuration (fill ratios, EC profile, CRUSH rule,
-  pool create, size/min_size, EC flags, autoscaler hints, compression, quotas, application, protection flags),
-  with copy-all, per-section copy and download as a shell script.
+  pool create, size/min_size (replicated), EC options, autoscaler hints, compression, quotas, application,
+  protection flags), with copy-all, per-section copy and download as a shell script. EC pools keep the
+  `min_size` Ceph sets on creation.
 - Light/dark theme, responsive single-column layout on phones, and configuration stored in the URL hash;
   the **Share** button copies that link (or opens the native share sheet on phones).
 - **TB / TiB** switch for all results (bar, tables, chart, warnings). Inputs such as OSD sizes stay in decimal TB,

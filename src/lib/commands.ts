@@ -1,6 +1,6 @@
 // Generates the Ceph CLI commands that create a pool for the current configuration.
 
-import { schemeMinSize, type Scheme, type Tunables } from './ceph'
+import type { Scheme, Tunables } from './ceph'
 import { effectiveProfileName, effectiveRuleName, type PoolOptions } from './pool'
 import type { DomainType } from './topology'
 
@@ -106,22 +106,26 @@ export function buildCommands(input: CommandInput): CommandSection[] {
     ],
   })
 
-  const redundancy: CommandLine[] = []
   if (scheme.kind === 'replicated' && scheme.size === 1) {
     // Ceph refuses single-copy pools unless explicitly allowed and confirmed.
-    redundancy.push(
-      { parts: ['ceph config set global mon_allow_pool_size_one true'], note: 'single-copy pools are blocked by default' },
-      cmd(`ceph osd pool set ${name} size 1 --yes-i-really-mean-it`),
-      set('min_size', scheme.minSize),
-    )
+    sections.push({
+      id: 'redundancy',
+      title: 'Redundancy',
+      lines: [
+        { parts: ['ceph config set global mon_allow_pool_size_one true'], note: 'single-copy pools are blocked by default' },
+        cmd(`ceph osd pool set ${name} size 1 --yes-i-really-mean-it`),
+        set('min_size', scheme.minSize),
+      ],
+    })
   } else if (scheme.kind === 'replicated') {
-    redundancy.push(set('size', scheme.size), set('min_size', scheme.minSize))
+    sections.push({ id: 'redundancy', title: 'Redundancy', lines: [set('size', scheme.size), set('min_size', scheme.minSize)] })
   } else {
-    redundancy.push(set('min_size', schemeMinSize(scheme)))
-    if (pool.ecOverwrites) redundancy.push(set('allow_ec_overwrites', true))
-    if (pool.fastRead) redundancy.push(set('fast_read', 1))
+    // Ceph already creates EC pools with min_size = k + min(1, m - 1), which the UI cannot change.
+    const ecLines: CommandLine[] = []
+    if (pool.ecOverwrites) ecLines.push(set('allow_ec_overwrites', true))
+    if (pool.fastRead) ecLines.push(set('fast_read', 1))
+    if (ecLines.length) sections.push({ id: 'ec-options', title: 'EC options', lines: ecLines })
   }
-  sections.push({ id: 'redundancy', title: 'Redundancy', lines: redundancy })
 
   if (pool.autoscaleMode !== 'off') {
     const pgLines: CommandLine[] = []
