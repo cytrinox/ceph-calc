@@ -42,6 +42,12 @@ export const TECHNIQUES_BY_PLUGIN: Record<EcPlugin, readonly EcTechnique[]> = {
   clay: ['reed_sol_van', 'reed_sol_r6_op', 'cauchy_orig', 'cauchy_good', 'liber8tion'],
 }
 
+/**
+ * allow_ec_optimizations (Ceph Tentacle and later) works only with these plugins and the
+ * reed_sol_van technique.
+ */
+export const EC_OPTIMIZATION_PLUGINS: readonly EcPlugin[] = ['jerasure', 'isa']
+
 /** Techniques that only work with exactly two coding chunks. */
 export const M2_ONLY_TECHNIQUES: readonly EcTechnique[] = ['reed_sol_r6_op', 'liberation', 'blaum_roth', 'liber8tion']
 
@@ -62,6 +68,8 @@ export interface PoolOptions {
   fastRead: boolean
   /** allow_ec_overwrites, required for RBD and CephFS data on EC pools. */
   ecOverwrites: boolean
+  /** allow_ec_optimizations (Tentacle+): partial reads and writes for small I/O; cannot be disabled. */
+  ecOptimizations: boolean
   autoscaleMode: AutoscaleMode
   /** pg_num when the autoscaler is off. */
   pgNum: number
@@ -107,6 +115,7 @@ export function defaultPoolOptions(): PoolOptions {
     stripeUnitKiB: 4,
     fastRead: false,
     ecOverwrites: true,
+    ecOptimizations: false,
     autoscaleMode: 'on',
     pgNum: 128,
     bulk: false,
@@ -184,6 +193,13 @@ export function poolIssues(pool: PoolOptions, scheme: Scheme): string[] {
       issues.push(`Technique ${pool.ecTechnique} is not available for the ${pool.ecPlugin} plugin.`)
     } else if (M2_ONLY_TECHNIQUES.includes(pool.ecTechnique) && scheme.m !== 2) {
       issues.push(`Technique ${pool.ecTechnique} requires m = 2.`)
+    }
+    if (pool.ecOptimizations) {
+      if (!EC_OPTIMIZATION_PLUGINS.includes(pool.ecPlugin) || pool.ecTechnique !== 'reed_sol_van') {
+        issues.push('EC optimizations need the jerasure or isa plugin with reed_sol_van.')
+      } else if (pool.stripeUnitKiB < 16) {
+        issues.push('With EC optimizations Ceph recommends a stripe_unit of at least 16K.')
+      }
     }
   }
   if (pool.autoscaleMode !== 'off' && pool.targetSizeRatio > 0 && pool.targetSizeTB > 0) {

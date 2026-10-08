@@ -122,6 +122,9 @@ export function buildCommands(input: CommandInput): CommandSection[] {
   } else {
     // Ceph already creates EC pools with min_size = k + min(1, m - 1), which the UI cannot change.
     const ecLines: CommandLine[] = []
+    if (pool.ecOptimizations) {
+      ecLines.push({ ...set('allow_ec_optimizations', true), note: 'Ceph Tentacle or later; cannot be disabled' })
+    }
     if (pool.ecOverwrites) ecLines.push(set('allow_ec_overwrites', true))
     if (pool.fastRead) ecLines.push(set('fast_read', 1))
     if (ecLines.length) sections.push({ id: 'ec-options', title: 'EC options', lines: ecLines })

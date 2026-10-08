@@ -97,6 +97,15 @@ describe('buildCommands', () => {
     expect(s).not.toContain('pool set data size 1\n')
   })
 
+  it('enables EC optimizations only when chosen', () => {
+    const pool = { ...defaultPoolOptions(), ecOptimizations: true }
+    expect(script(input({ kind: 'ec', k: 4, m: 2 }, pool))).toContain(
+      'ceph osd pool set data allow_ec_optimizations true  # Ceph Tentacle or later; cannot be disabled',
+    )
+    expect(script(input({ kind: 'ec', k: 4, m: 2 }))).not.toContain('allow_ec_optimizations')
+    expect(script(input({ kind: 'replicated', size: 3, minSize: 2 }, pool))).not.toContain('allow_ec_optimizations')
+  })
+
   it('leaves min_size of EC pools to Ceph', () => {
     const pool = { ...defaultPoolOptions(), ecOverwrites: false, fastRead: false }
     const s = script(input({ kind: 'ec', k: 2, m: 1 }, pool))

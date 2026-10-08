@@ -60,6 +60,20 @@ describe('pool options', () => {
     expect(poolIssues({ ...base, ecPlugin: 'clay', ecTechnique: 'liber8tion' }, ec42)).toEqual([])
   })
 
+  it('checks EC optimizations against plugin, technique and stripe_unit', () => {
+    const opt = { ...defaultPoolOptions(), ecOptimizations: true, stripeUnitKiB: 16 }
+    expect(poolIssues(opt, ec42)).toEqual([])
+    expect(poolIssues({ ...opt, ecPlugin: 'isa' }, ec42)).toEqual([])
+    const unsupported = 'EC optimizations need the jerasure or isa plugin with reed_sol_van.'
+    expect(poolIssues({ ...opt, ecPlugin: 'clay' }, ec42)).toEqual([unsupported])
+    expect(poolIssues({ ...opt, ecTechnique: 'cauchy_good' }, ec42)).toEqual([unsupported])
+    expect(poolIssues({ ...opt, stripeUnitKiB: 4 }, ec42)).toEqual([
+      'With EC optimizations Ceph recommends a stripe_unit of at least 16K.',
+    ])
+    // replicated pools ignore EC settings
+    expect(poolIssues({ ...opt, ecPlugin: 'clay' }, rep3)).toEqual([])
+  })
+
   it('warns when both target size hints are set', () => {
     const pool = { ...defaultPoolOptions(), targetSizeRatio: 0.2, targetSizeTB: 100 }
     expect(poolIssues(pool, rep3)).toEqual(['Both target size ratio and bytes are set; Ceph uses the ratio.'])

@@ -117,6 +117,7 @@ export function sanitizePool(raw: unknown): PoolOptions {
       : d.stripeUnitKiB,
     fastRead: bool(r.fastRead, d.fastRead),
     ecOverwrites: bool(r.ecOverwrites, d.ecOverwrites),
+    ecOptimizations: bool(r.ecOptimizations, d.ecOptimizations),
     autoscaleMode: pick(AUTOSCALE_MODES, r.autoscaleMode, d.autoscaleMode),
     pgNum: Math.max(1, int(r.pgNum ?? d.pgNum)),
     bulk: bool(r.bulk, d.bulk),

@@ -181,6 +181,12 @@ const safetySummary = computed(() => {
         code="fast_read"
         hint="Read all shards, decode from the first k replies: lower latency, more traffic"
       />
+      <ToggleField
+        v-model="pool.ecOptimizations"
+        label="EC optimizations"
+        code="allow_ec_optimizations"
+        hint="Partial reads and writes for small I/O; Ceph Tentacle or later, cannot be disabled"
+      />
     </template>
 
     <details class="group">
