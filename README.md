@@ -11,6 +11,8 @@ Source: <https://github.com/cytrinox/ceph-calc>
   (`host`, `chassis`, `rack`, `row`, `pdu`, `pod`, `room`, `datacenter`, `zone`, `region`).
   Every bucket has a `×N` multiplier for identical copies plus duplicate/split/remove actions, and
   hosts contain one or more OSD groups (`count × size`). Any bucket type can be the failure domain.
+  **Examples** (from a small 4-host cluster to two datacenters) load a complete setup: topology, failure domain,
+  pool layout, recovery reserve and Ceph's default fill ratios.
 - Price: price per TB of raw drive capacity (default 500) with a free-text currency (`EUR`, `$`, `USD`, …);
   the Real net capacity card shows the cluster's drive cost and the cost per usable TB.
 - Pool schemes: replication (`size`, `min_size`) or erasure coding (`k`, `m`), with common presets.

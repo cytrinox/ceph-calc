@@ -1,3 +1,5 @@
+import type { Scheme } from './ceph'
+
 // CRUSH topology model: a tree of buckets (Ceph default types) with OSD groups as leaves.
 
 export const BUCKET_TYPES = [
@@ -382,8 +384,13 @@ export interface TopologyExample {
   label: string
   /** Failure domain that suits the example; set when it is loaded. */
   domain: DomainType
+  /** Pool layout and recovery reserve that suit the example; set when it is loaded (with Ceph's default ratios). */
+  scheme: Scheme
+  recoveryReserve: number
   build(): Topology
 }
+
+const REP3: Scheme = { kind: 'replicated', size: 3, minSize: 2 }
 
 const host = (name: string, count: number, osds: [number, number][]) =>
   newBucket('host', name, { count, osds: osds.map(([n, size]) => newOsdGroup(n, size)) })
@@ -393,12 +400,16 @@ export const TOPOLOGY_EXAMPLES: TopologyExample[] = [
     id: 'small',
     label: 'Small cluster · 4 hosts × 6 × 8 TB',
     domain: 'host',
+    scheme: REP3,
+    recoveryReserve: 1,
     build: () => [host('host01', 4, [[6, 8]])],
   },
   {
     id: 'single-host',
     label: 'Single host · 5 × 4 TB + 1 × 1 TB OSDs',
     domain: 'osd',
+    scheme: REP3,
+    recoveryReserve: 1,
     build: () => [
       host('host01', 1, [
         [5, 4],
@@ -410,18 +421,24 @@ export const TOPOLOGY_EXAMPLES: TopologyExample[] = [
     id: 'mixed',
     label: 'Mixed generations · 3 × 96 TB + 2 × 192 TB hosts',
     domain: 'host',
+    scheme: REP3,
+    recoveryReserve: 1,
     build: () => [host('gen1-host01', 3, [[12, 8]]), host('gen2-host01', 2, [[12, 16]])],
   },
   {
     id: 'racks',
     label: 'Rack-aware · 5 racks × 4 hosts × 12 × 16 TB',
     domain: 'rack',
+    scheme: { kind: 'ec', k: 2, m: 2 },
+    recoveryReserve: 1,
     build: () => [newBucket('rack', 'rack01', { count: 5, children: [host('host01', 4, [[12, 16]])] })],
   },
   {
     id: 'unbalanced',
     label: 'Unbalanced racks · 6 / 6 / 4 / 2 hosts',
     domain: 'rack',
+    scheme: REP3,
+    recoveryReserve: 1,
     build: () =>
       [6, 6, 4, 2].map((hosts, i) =>
         newBucket('rack', `rack0${i + 1}`, { children: [host(`r${i + 1}-host01`, hosts, [[12, 16]])] }),
@@ -431,6 +448,8 @@ export const TOPOLOGY_EXAMPLES: TopologyExample[] = [
     id: 'chassis',
     label: 'Blade chassis · 2 racks × 3 chassis × 4 blades',
     domain: 'chassis',
+    scheme: REP3,
+    recoveryReserve: 1,
     build: () => [
       newBucket('rack', 'rack01', {
         count: 2,
@@ -442,6 +461,8 @@ export const TOPOLOGY_EXAMPLES: TopologyExample[] = [
     id: 'all-types',
     label: 'Every bucket type · region → zone → … → chassis → host',
     domain: 'rack',
+    scheme: { kind: 'ec', k: 6, m: 3 },
+    recoveryReserve: 2,
     // Nested strictly by CRUSH type id; pdu (5) sits above row (4) as in Ceph's default map.
     build: () => {
       const levels: [BucketType, string, number][] = [
@@ -466,6 +487,8 @@ export const TOPOLOGY_EXAMPLES: TopologyExample[] = [
     id: 'datacenters',
     label: 'Two datacenters · 3 + 7 rows × 20 racks × 20 hosts',
     domain: 'rack',
+    scheme: { kind: 'ec', k: 8, m: 3 },
+    recoveryReserve: 2,
     build: buildExampleTopology,
   },
 ]

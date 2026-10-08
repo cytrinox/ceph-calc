@@ -14,7 +14,7 @@ import { DEFAULT_RATIOS, ratiosOrdered, schemeMinSize } from '@/lib/ceph'
 import { CUSTOM_EC, CUSTOM_REPLICATED, DEFAULT_PRESET_ID, PRESETS, schemeLabel, schemeSelection } from '@/lib/schemes'
 import { formatInt } from '@/lib/format'
 import { CURRENCY_MAX_LENGTH, formatPrice } from '@/lib/pricing'
-import { TYPE_ID, plural, type DomainType } from '@/lib/topology'
+import { TYPE_ID, plural, type DomainType, type TopologyExample } from '@/lib/topology'
 import type { AppState, TopologyTab } from '@/lib/urlState'
 
 const props = defineProps<{
@@ -72,6 +72,18 @@ watch(
   },
 )
 
+// An example sets up the whole cluster: besides the topology, its failure domain, pool layout and
+// recovery reserve, with Ceph's default fill ratios.
+function applyExample(example: TopologyExample) {
+  const st = props.state
+  st.failureDomain = example.domain
+  st.scheme = { ...example.scheme }
+  st.recoveryReserve = example.recoveryReserve
+  st.nearfullRatio = DEFAULT_RATIOS.nearfull
+  st.backfillfullRatio = DEFAULT_RATIOS.backfillfull
+  st.fullRatio = DEFAULT_RATIOS.full
+}
+
 const domain = computed(() => props.state.failureDomain)
 
 // One-line summaries shown in a step's header while it is collapsed.
@@ -113,7 +125,7 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
         v-else-if="state.advanced"
         v-model="state.advanced"
         @reset-from-basic="emit('resetFromBasic')"
-        @example-loaded="(domain) => (state.failureDomain = domain)"
+        @example-loaded="applyExample"
       />
 
       <div class="pricing">

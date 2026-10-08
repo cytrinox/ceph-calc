@@ -13,13 +13,13 @@ import {
   plural,
   topologyStats,
   type BucketType,
-  type DomainType,
   type Topology,
+  type TopologyExample,
 } from '@/lib/topology'
 import { USED_NAMES_KEY } from './treeContext'
 
 const model = defineModel<Topology>({ required: true })
-const emit = defineEmits<{ resetFromBasic: []; exampleLoaded: [domain: DomainType] }>()
+const emit = defineEmits<{ resetFromBasic: []; exampleLoaded: [example: TopologyExample] }>()
 
 provide(USED_NAMES_KEY, () => collectNames(model.value))
 
@@ -48,9 +48,10 @@ function loadExample(event: Event) {
   const example = TOPOLOGY_EXAMPLES.find((e) => e.id === select.value)
   select.value = ''
   if (!example) return
-  if (model.value.length && !confirm(`Replace the current topology with “${example.label}”?`)) return
+  const question = `Load the example “${example.label}”? It replaces the topology, redundancy and headroom settings.`
+  if (model.value.length && !confirm(question)) return
   model.value = example.build()
-  emit('exampleLoaded', example.domain)
+  emit('exampleLoaded', example)
 }
 
 function resetFromBasic() {
@@ -72,7 +73,7 @@ function resetFromBasic() {
       <button type="button" title="Rebuild from the Basic tab" @click="resetFromBasic">
         <AppIcon name="reset" :size="14" /> From Basic
       </button>
-      <label class="add examples" title="Load an example topology">
+      <label class="add examples" title="Load an example cluster: topology, redundancy and headroom">
         <AppIcon name="sparkle" :size="14" />
         <select aria-label="Load an example topology" value="" @change="loadExample">
           <option value="" disabled>Examples…</option>

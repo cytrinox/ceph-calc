@@ -19,6 +19,7 @@ import {
   domainBalance,
 } from './topology'
 import { decodeState, defaultState, encodeState } from './urlState'
+import { computeCapacity, DEFAULT_RATIOS } from './ceph'
 
 const example = (id: string) => TOPOLOGY_EXAMPLES.find((e) => e.id === id)!.build()
 
@@ -118,6 +119,15 @@ describe('topology', () => {
       if (ex.domain !== 'osd') expect(types).toContain(ex.domain)
       // every capacity sits under a bucket of the suggested failure domain
       expect(failureDomains(t, ex.domain).unplacedTB).toBe(0)
+      // its redundancy and headroom settings fit the topology
+      const r = computeCapacity(failureDomains(t, ex.domain), ex.scheme, {
+        fullRatio: DEFAULT_RATIOS.full,
+        backfillfullRatio: DEFAULT_RATIOS.backfillfull,
+        nearfullRatio: DEFAULT_RATIOS.nearfull,
+        recoveryReserve: ex.recoveryReserve,
+      })
+      expect(r.valid, ex.id).toBe(true)
+      expect(ex.recoveryReserve, ex.id).toBeGreaterThanOrEqual(1)
     }
     expect(topologyStats(example('chassis')).counts).toMatchObject({ rack: 2, chassis: 6, host: 24 })
   })
