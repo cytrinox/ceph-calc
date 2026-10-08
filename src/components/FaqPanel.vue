@@ -270,6 +270,12 @@ IOPS  = N_eff ÷ (reads ÷ R + writes ÷ W)</pre>
               <code>ceph tell osd.N bench</code>).
             </li>
           </ul>
+          <p>
+            The estimate assumes the drives are the limit. That makes the numbers for optimized EC pools an upper bound:
+            with partial reads a small read touches one OSD instead of k, so the model predicts up to k times more read
+            IOPS. Ceph's own Tentacle benchmarks measured 2–3× faster small reads for EC 6+2, because CPU and network
+            become the limit first.
+          </p>
           <p class="tip">
             <AppIcon name="sparkle" :size="14" />
             <span>
