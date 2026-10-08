@@ -54,6 +54,10 @@ describe('pool options', () => {
       'Technique liberation requires m = 2.',
     ])
     expect(poolIssues({ ...base, ecPlugin: 'isa', ecTechnique: 'cauchy_good' }, ec42)[0]).toMatch(/not available/)
+    // clay (scalar_mds jerasure) accepts neither liberation nor blaum_roth
+    expect(poolIssues({ ...base, ecPlugin: 'clay', ecTechnique: 'liberation' }, ec42)[0]).toMatch(/not available/)
+    expect(poolIssues({ ...base, ecPlugin: 'clay', ecTechnique: 'blaum_roth' }, ec42)[0]).toMatch(/not available/)
+    expect(poolIssues({ ...base, ecPlugin: 'clay', ecTechnique: 'liber8tion' }, ec42)).toEqual([])
   })
 
   it('warns when both target size hints are set', () => {

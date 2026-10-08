@@ -31,13 +31,14 @@ export type EcPlugin = (typeof EC_PLUGINS)[number]
 export type EcTechnique = (typeof EC_TECHNIQUES)[number]
 
 /**
- * Techniques per plugin. clay delegates to a scalar MDS code (jerasure by
- * default), so it accepts the jerasure techniques.
+ * Techniques per plugin. clay delegates to a scalar MDS code (jerasure by default); per the
+ * Ceph clay docs it then accepts reed_sol_van, reed_sol_r6_op, cauchy_orig, cauchy_good and
+ * liber8tion, but not liberation or blaum_roth.
  */
 export const TECHNIQUES_BY_PLUGIN: Record<EcPlugin, readonly EcTechnique[]> = {
   jerasure: ['reed_sol_van', 'reed_sol_r6_op', 'cauchy_orig', 'cauchy_good', 'liberation', 'blaum_roth', 'liber8tion'],
   isa: ['reed_sol_van', 'cauchy'],
-  clay: ['reed_sol_van', 'reed_sol_r6_op', 'cauchy_orig', 'cauchy_good', 'liberation', 'blaum_roth', 'liber8tion'],
+  clay: ['reed_sol_van', 'reed_sol_r6_op', 'cauchy_orig', 'cauchy_good', 'liber8tion'],
 }
 
 /** Techniques that only work with exactly two coding chunks. */
