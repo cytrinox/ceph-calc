@@ -4,7 +4,7 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="color-scheme" content="dark" />
-    <meta name="description" content="Ceph storage calculator: usable capacity, efficiency, failure tolerance and reserved margins for replicated and erasure-coded pools." />
+    <meta name="description" content="The ceph real net capacity calculator: how much data a Ceph cluster really stores below the nearfull ratio, with recovery reserve, failure tolerance and efficiency for replicated and erasure-coded pools." />
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <title>The ceph real net capacity calculator</title>
     <script>
@@ -13,6 +13,7 @@
         var t = localStorage.getItem('ceph-calculator-theme')
         if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
         document.documentElement.dataset.theme = t
+        document.querySelector('meta[name="color-scheme"]').setAttribute('content', t)
       } catch (e) {}
     </script>
   </head>
