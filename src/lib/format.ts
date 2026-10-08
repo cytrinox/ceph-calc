@@ -21,6 +21,12 @@ export function formatPct(fraction: number): string {
 }
 
 const intFormat = new Intl.NumberFormat('en-US')
+const iopsFormat = new Intl.NumberFormat('en-US', { notation: 'compact', maximumSignificantDigits: 3 })
+
+/** IOPS with 3 significant digits: 240, 2.4K, 48.5K, 1.23M. */
+export function formatIops(n: number): string {
+  return Number.isFinite(n) ? iopsFormat.format(n) : '—'
+}
 
 export function formatInt(n: number): string {
   return intFormat.format(n)

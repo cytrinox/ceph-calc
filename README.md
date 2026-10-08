@@ -20,11 +20,14 @@ Source: <https://github.com/cytrinox/ceph-calc>
   spare domains = domains − copies/shards per object) and the nearfull (0.85), backfillfull (0.90) and full
   (0.95) ratios.
 - Pool configuration: pool name, application, CRUSH rule name, device class, EC profile and plugin,
-  EC `technique` and `stripe_unit`, `allow_ec_overwrites`, `fast_read`, PG autoscaling, `pg_num` (with a
+  EC `technique` and `stripe_unit`, `allow_ec_overwrites`, `fast_read`, `allow_ec_optimizations` (Ceph
+  Tentacle), PG autoscaling, `pg_num` (with a
   suggested value), `bulk`, `target_size_ratio` / `target_size_bytes`, compression (with an expected
   compression ratio, default 0.90, shown as an effective-capacity badge), quotas, and the `nodelete` /
   `nosizechange` flags. Leave the rule or profile name empty to get a derived name such as `rep3_host`
   or `ec-4-2-rack-nvme`.
+- IOPS (step 5, optional): 4k random read and write IOPS per OSD give an estimated cluster ceiling for the
+  selected layout (result card) and for every preset (comparison table).
 - Raw data distribution bar: usable data, protection overhead, reserved headroom (kept free on purpose) and,
   when there is any, unusable space (yellow; can never be filled), with markers where a healthy cluster
   reaches the nearfull, backfillfull and full ratios. Below the usable share, `+X until backfillfull` /
@@ -77,6 +80,21 @@ Source: <https://github.com/cytrinox/ceph-calc>
    or `k` when `m = 1`). **Min domains** = `w + N`.
 
 For a uniform cluster this reduces to `raw × (D − N)/D × nearfull × f`, where `D` is the number of failure domains.
+
+### IOPS estimate
+
+OSD operations per 4k client operation:
+
+| Layout | Client read | Client write |
+| --- | --- | --- |
+| Replication, `size` n | 1 read | n writes |
+| EC k+m | k reads (k+m with `fast_read`) | k reads + k+m writes (read-modify-write) |
+| EC k+m with `allow_ec_optimizations` | 1 read | min(1+m, k−1) reads + 1+m writes |
+
+With `R` / `W` the per-OSD read / write IOPS, `N_eff = placed capacity ÷ largest OSD` (CRUSH spreads I/O by
+capacity, so the largest OSDs saturate first; equal OSDs give the OSD count) and `IOPS = N_eff ÷ (reads ÷ R +
+writes ÷ W)`. It is a ceiling for a healthy cluster with many parallel requests; network, CPU, latency, recovery
+and scrubbing are not modelled.
 
 ## Development
 

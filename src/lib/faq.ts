@@ -3,6 +3,7 @@
 export const FAQ_IDS = {
   realNet: 'faq-real-net-capacity',
   recoveryReserve: 'faq-recovery-reserve',
+  iops: 'faq-iops',
 } as const
 
 export type FaqId = (typeof FAQ_IDS)[keyof typeof FAQ_IDS]

@@ -15,6 +15,7 @@ import {
 } from './pool'
 import { DEFAULT_RATIOS, type Scheme } from './ceph'
 import { CURRENCY_MAX_LENGTH, DEFAULT_CURRENCY, DEFAULT_PRICE_PER_TB } from './pricing'
+import { MAX_OSD_IOPS } from './iops'
 import {
   ALL_DOMAIN_TYPES,
   BUCKET_TYPES,
@@ -45,6 +46,9 @@ export interface AppState {
   pricePerTB: number
   /** Free-text currency (EUR, $, USD, …). */
   currency: string
+  /** 4k random IOPS one OSD sustains (0 = not set, no IOPS estimate). */
+  osdReadIops: number
+  osdWriteIops: number
 }
 
 export function defaultState(): AppState {
@@ -61,6 +65,8 @@ export function defaultState(): AppState {
     pool: defaultPoolOptions(),
     pricePerTB: DEFAULT_PRICE_PER_TB,
     currency: DEFAULT_CURRENCY,
+    osdReadIops: 0,
+    osdWriteIops: 0,
   }
 }
 
@@ -82,7 +88,11 @@ interface Packed {
   /** Price per TB. */
   pt?: number
   cu?: string
+  /** Read and write IOPS per OSD; left out when not set. */
+  io?: [number, number]
 }
+
+const iops = (value: unknown) => Math.min(MAX_OSD_IOPS, int(value))
 
 /** A fill ratio from untrusted input, clamped to 0–1; the fallback when missing or not a number. */
 function ratioOr(value: unknown, fallback: number): number {
@@ -199,6 +209,9 @@ export function encodeState(state: AppState): string {
     p: state.pool,
     pt: num(state.pricePerTB),
     cu: state.currency,
+    ...(state.osdReadIops > 0 || state.osdWriteIops > 0
+      ? { io: [iops(state.osdReadIops), iops(state.osdWriteIops)] as [number, number] }
+      : {}),
   }
   if (state.advanced) packed.a = state.advanced.map(packBucket)
   return toBase64Url(JSON.stringify(packed))
@@ -230,6 +243,10 @@ export function decodeState(data: string): AppState | null {
     state.pool = sanitizePool(p.p)
     if (typeof p.pt === 'number' && Number.isFinite(p.pt)) state.pricePerTB = Math.max(0, p.pt)
     if (typeof p.cu === 'string') state.currency = p.cu.slice(0, CURRENCY_MAX_LENGTH)
+    if (Array.isArray(p.io)) {
+      state.osdReadIops = iops(p.io[0])
+      state.osdWriteIops = iops(p.io[1])
+    }
     return state
   } catch {
     return null

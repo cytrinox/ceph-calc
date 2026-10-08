@@ -4,7 +4,8 @@ import AppIcon from './AppIcon.vue'
 import CapacityBar from './CapacityBar.vue'
 import FaqLink from './FaqLink.vue'
 import { FAQ_IDS } from '@/lib/faq'
-import { formatPct, formatInt } from '@/lib/format'
+import { formatIops, formatPct, formatInt } from '@/lib/format'
+import { describeCost, type IopsEstimate, type OpCost } from '@/lib/iops'
 import { formatCapacity } from '@/lib/units'
 import { placementMessage, type CapacityResult } from '@/lib/ceph'
 import { plural, type DomainType } from '@/lib/topology'
@@ -20,7 +21,16 @@ const props = defineProps<{
   price: { total: string; perUsableTB: string | null; detail: string } | null
   /** Effective capacity with compression; null when compression is off. */
   compression: { effective: string; detail: string } | null
+  /** 4k random IOPS estimate; null when no per-OSD IOPS are set. */
+  iops: IopsEstimate | null
 }>()
+
+const IOPS_TITLE = '4k random IOPS until the largest OSDs are saturated: a ceiling for a healthy cluster with many parallel requests'
+const iopsValue = (n: number | null) => (props.result.valid && n !== null ? formatIops(n) : '—')
+const iopsNote = (n: number | null, cost: OpCost, op: string) =>
+  n !== null
+    ? `${describeCost(cost)} per ${op}`
+    : `needs ${[cost.reads > 0 && 'read', cost.writes > 0 && 'write'].filter(Boolean).join(' and ')} IOPS per OSD`
 
 const usableParts = computed(() => {
   const [value, unit] = formatCapacity(props.result.usableTB).split(' ')
@@ -97,6 +107,22 @@ const usableParts = computed(() => {
             <dd>
               <strong>{{ result.ioFailuresTolerated }} {{ plural(domain, result.ioFailuresTolerated) }}</strong>
               <span>I/O continues (min_size {{ result.minSize }})</span>
+            </dd>
+          </div>
+        </dl>
+        <dl v-if="iops" class="kpi">
+          <div class="half" :title="IOPS_TITLE">
+            <dt><AppIcon name="download" :size="14" /> Read IOPS</dt>
+            <dd>
+              <strong>{{ iopsValue(iops.read) }}</strong>
+              <span>{{ iopsNote(iops.read, iops.costs.read, 'read') }}</span>
+            </dd>
+          </div>
+          <div class="half" :title="IOPS_TITLE">
+            <dt><AppIcon name="upload" :size="14" /> Write IOPS</dt>
+            <dd>
+              <strong>{{ iopsValue(iops.write) }}</strong>
+              <span>{{ iopsNote(iops.write, iops.costs.write, 'write') }}</span>
             </dd>
           </div>
         </dl>

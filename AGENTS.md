@@ -42,6 +42,7 @@ src/
     urlState.ts           AppState <-> compact JSON in the URL hash (#s=…), defaults, untrusted-input checks
     format.ts / units.ts  number formatting; TB/TiB display unit (formatCapacity)
     pricing.ts            price per TB, cost per usable TB, formatPrice, CURRENCY_MAX_LENGTH
+    iops.ts               IOPS estimate: OSD ops per client op (opCosts), capacity-weighted OSD count, ceiling
     faq.ts                FAQ anchor ids + openFaq()
   styles/                 _tokens.scss (breakpoints, fonts, mixins), _themes.scss (colour tokens), main.scss
 ```
@@ -78,7 +79,23 @@ real net = placeable(domains − N largest) × nearfull × f
   - EC uses Ceph's default `k + min(1, m − 1)` (`schemeMinSize`).
 - **"Not enough failure domains" wording** comes from `placementHint()` / `placementMessage()` only (e.g. "needs 8
   hosts (+ 2 recovery reserve)"). Don't build such sentences elsewhere.
-- **First visit:** Replication 3x, recovery reserve 0, ratios 0.85 / 0.90 / 0.95, price 500 EUR/TB.
+- **First visit:** Replication 3x, recovery reserve 0, ratios 0.85 / 0.90 / 0.95, price 500 EUR/TB, no IOPS.
+
+## IOPS estimate (`src/lib/iops.ts`)
+
+```
+N_eff = placed capacity / largest OSD      (CRUSH weights I/O by capacity; equal OSDs = OSD count)
+IOPS  = N_eff / (reads / R + writes / W)   (R, W = per-OSD 4k read / write IOPS from step 5)
+```
+
+- **OSD operations per client op:**
+  - replication: 1 read / n writes;
+  - classic EC: k reads (k+m with `fast_read`) / k reads + k+m writes;
+  - `allow_ec_optimizations` (Tentacle): 1 read / min(1+m, k−1) reads + 1+m writes.
+- **Opt-in:** with both inputs at 0 the result card's IOPS row and the table's IOPS column are hidden. A value an
+  operation needs but that is 0 shows "—".
+- **Scope:** a healthy-cluster ceiling only. Keep it that way unless the model is extended deliberately (network,
+  CPU, latency and recovery are out of scope).
 
 ## Conventions
 
@@ -113,7 +130,8 @@ real net = placeable(domains − N largest) × nearfull × f
 - **Colours:** every colour is a CSS custom property in `_themes.scss`. **Add each new token to both `$dark` and
   `$light`.** The theme follows the system preference until the user picks one, with dark as the fallback.
 - **Responsive:** two columns above 900px and one column below. The page must work at phone width with no
-  horizontal scrolling. The capacity legend uses a container query (4 → 2 × 2 → 1 columns).
+  horizontal scrolling. Container queries follow the card width, not the viewport: the capacity legend
+  (4 → 2 × 2 → 1 columns) and the comparison table (compact rows below 40rem, 45rem with the IOPS column).
 - **Icons:** hand-drawn single-path SVGs (24×24 viewBox, stroke 2, round caps) in `AppIcon.vue`. Add new ones there;
   there is no icon library.
 - **Hatching:** reserved headroom uses a grey hatch and unusable space a yellow-tinted hatch, in the bar and in the
@@ -126,7 +144,7 @@ real net = placeable(domains − N largest) × nearfull × f
   - Share limits through constants, e.g. `CURRENCY_MAX_LENGTH`.
 - **FAQ links** use `openFaq()`, not `#fragment` links, because the hash holds the configuration.
 - **Per-viewer preferences** live in `localStorage`: `ceph-calculator-theme`, `ceph-calculator-unit` and
-  `ceph-calculator-step-N` (collapsed steps; steps 2–4 start collapsed). Always wrap `localStorage` access in
+  `ceph-calculator-step-N` (collapsed steps; steps 2–5 start collapsed). Always wrap `localStorage` access in
   `try/catch`.
 
 ### Topology editor
@@ -144,6 +162,8 @@ real net = placeable(domains − N largest) × nearfull × f
   - EC profiles: `ec-4-2-rack-nvme`.
 - **EC techniques:** `TECHNIQUES_BY_PLUGIN` lists only what each plugin accepts (clay: no `liberation` and no
   `blaum_roth`).
+- **`allow_ec_optimizations`:** emitted with a note (Tentacle or later, cannot be disabled). `poolIssues` flags
+  plugins/techniques other than jerasure or isa with `reed_sol_van`, and a `stripe_unit` below 16K.
 
 ## Container, nginx and CI
 - **Image:** multi-stage `Containerfile`. The Node 22 build stage runs on the build platform and runs the tests; the

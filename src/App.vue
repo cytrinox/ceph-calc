@@ -27,6 +27,7 @@ import {
   type DomainType,
 } from './lib/topology'
 import { defaultState, readStateFromUrl, writeStateToUrl, type AppState } from './lib/urlState'
+import { estimateIops, iopsBasis } from './lib/iops'
 
 // Same calculator pictogram as the favicon (served from public/).
 const logoUrl = `${import.meta.env.BASE_URL}favicon.svg`
@@ -75,6 +76,16 @@ const tunables = computed(() => ({
   recoveryReserve: num(state.recoveryReserve),
 }))
 const result = computed(() => computeCapacity(input.value, state.scheme, tunables.value))
+
+// IOPS estimate (opt-in): per-OSD IOPS weighted by the OSDs the rule can use.
+const iops = computed(() =>
+  iopsBasis(
+    { read: num(state.osdReadIops), write: num(state.osdWriteIops) },
+    stats.value.rawTB - domains.value.unplacedTB,
+    stats.value.largestOsdTB,
+  ),
+)
+const iopsEstimate = computed(() => (iops.value ? estimateIops(iops.value, state.scheme, state.pool) : null))
 
 const facts = computed(() => {
   const s = stats.value
@@ -235,12 +246,15 @@ watch(
           :domain="state.failureDomain"
           :recovery-reserve="tunables.recoveryReserve"
           :warnings="warnings"
+          :iops="iopsEstimate"
         />
         <SchemeTable
           :input="input"
           :tunables="tunables"
           :current="state.scheme"
           :domain="state.failureDomain"
+          :iops="iops"
+          :pool="state.pool"
           @select="selectScheme"
         />
         <CommandsPanel

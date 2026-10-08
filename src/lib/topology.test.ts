@@ -174,6 +174,16 @@ describe('topology', () => {
     expect([decoded.nearfullRatio, decoded.backfillfullRatio, decoded.fullRatio]).toEqual([0, 0.4, 1])
   })
 
+  it('stores the per-OSD IOPS in shared links only when set', () => {
+    const state = defaultState()
+    expect([state.osdReadIops, state.osdWriteIops]).toEqual([0, 0])
+    expect(encodeState(state)).toBe(encodeState(decodeState(encodeState(state))!))
+    state.osdReadIops = 5000
+    state.osdWriteIops = 99_000_000
+    const decoded = decodeState(encodeState(state))!
+    expect([decoded.osdReadIops, decoded.osdWriteIops]).toEqual([5000, 10_000_000])
+  })
+
   it('clamps all ratios to 0–1 when encoding a link', () => {
     const state = defaultState()
     state.nearfullRatio = -0.2

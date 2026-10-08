@@ -12,7 +12,8 @@ import { FAQ_IDS } from '@/lib/faq'
 import TabGroup from './TabGroup.vue'
 import { DEFAULT_RATIOS, ratiosOrdered, schemeMinSize } from '@/lib/ceph'
 import { CUSTOM_EC, CUSTOM_REPLICATED, DEFAULT_PRESET_ID, PRESETS, schemeLabel, schemeSelection } from '@/lib/schemes'
-import { formatInt } from '@/lib/format'
+import { formatInt, formatIops } from '@/lib/format'
+import { MAX_OSD_IOPS } from '@/lib/iops'
 import { CURRENCY_MAX_LENGTH, formatPrice } from '@/lib/pricing'
 import { TYPE_ID, plural, type DomainType, type TopologyExample } from '@/lib/topology'
 import type { AppState, TopologyTab } from '@/lib/urlState'
@@ -104,6 +105,12 @@ const headroomSummary = computed(() => {
 const poolSummary = computed(() => {
   const pool = props.state.pool
   return `${pool.name || 'data'} · ${pool.application} · autoscale ${pool.autoscaleMode}`
+})
+const iopsSummary = computed(() => {
+  const { osdReadIops: r, osdWriteIops: w } = props.state
+  if (!(r > 0) && !(w > 0)) return 'not set'
+  const value = (n: number) => (n > 0 ? formatIops(n) : '—')
+  return `read ${value(r)} · write ${value(w)} IOPS per OSD`
 })
 
 /** Failure domains beyond what one object needs: the most the recovery reserve can cover. */
@@ -287,6 +294,35 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
         :osd-count="osdCount"
       />
     </StepSection>
+
+    <StepSection :num="5" collapsed-by-default title="IOPS" subtitle="Per-OSD 4k IOPS for a performance estimate" :summary="iopsSummary">
+      <div class="stack">
+        <NumberField
+          v-model="state.osdReadIops"
+          label="Read IOPS"
+          hint="4k random reads one OSD sustains"
+          :min="0"
+          :max="MAX_OSD_IOPS"
+          :step="100"
+        >
+          <template #label-after>
+            <FaqLink :target="FAQ_IDS.iops" topic="the IOPS estimate" />
+          </template>
+        </NumberField>
+        <NumberField
+          v-model="state.osdWriteIops"
+          label="Write IOPS"
+          hint="4k random writes one OSD sustains"
+          :min="0"
+          :max="MAX_OSD_IOPS"
+          :step="100"
+        />
+        <p class="measure">
+          Measure on the OSD itself (e.g. <code>ceph tell osd.N bench</code> for writes, or fio against an OSD), so
+          BlueStore overhead is included. Leave both at 0 to hide the estimate.
+        </p>
+      </div>
+    </StepSection>
   </section>
 </template>
 
@@ -411,6 +447,17 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
   gap: 0.8rem;
   padding-top: 0.9rem;
   border-top: 1px dashed var(--border-strong);
+}
+
+.measure {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+
+  code {
+    font-family: $font-mono;
+    font-size: 0.95em;
+  }
 }
 
 .ratio-error {

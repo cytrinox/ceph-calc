@@ -20,6 +20,7 @@ export type IconName =
   | 'check'
   | 'terminal'
   | 'download'
+  | 'upload'
   | 'share'
   | 'help'
   | 'scale'
@@ -46,6 +47,7 @@ const PATHS: Record<IconName, string> = {
   check: 'M5 12l5 5L20 7',
   terminal: 'M4 17l6-5-6-5M12 19h8',
   download: 'M12 3v12m0 0-4-4m4 4 4-4M4 21h16',
+  upload: 'M12 21V9m0 0-4 4m4-4 4 4M4 3h16',
   help: 'M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z',
   share: 'M10 14a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5M14 10a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5',
   alert: 'M12 9v4m0 4h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',

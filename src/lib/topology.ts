@@ -212,6 +212,8 @@ export interface TreeStats {
   counts: TypeCounts
   rawTB: number
   emptyBuckets: number
+  /** Capacity of the largest single OSD (0 without OSDs). */
+  largestOsdTB: number
 }
 
 function emptyCounts(): TypeCounts {
@@ -222,14 +224,18 @@ function addStats(into: TreeStats, from: TreeStats, factor: number): void {
   for (const t of ALL_DOMAIN_TYPES) into.counts[t] += from.counts[t] * factor
   into.rawTB += from.rawTB * factor
   into.emptyBuckets += from.emptyBuckets * factor
+  if (factor > 0) into.largestOsdTB = Math.max(into.largestOsdTB, from.largestOsdTB)
 }
 
 /** Statistics of a single copy of `bucket` (including itself, excluding its own count). */
 export function bucketStats(bucket: Bucket): TreeStats {
-  const stats: TreeStats = { counts: emptyCounts(), rawTB: 0, emptyBuckets: 0 }
+  const stats: TreeStats = { counts: emptyCounts(), rawTB: 0, emptyBuckets: 0, largestOsdTB: 0 }
   stats.counts[bucket.type] = 1
   if (bucket.type === 'host') {
-    for (const o of bucket.osds) stats.counts.osd += int(o.count)
+    for (const o of bucket.osds) {
+      stats.counts.osd += int(o.count)
+      if (int(o.count) > 0) stats.largestOsdTB = Math.max(stats.largestOsdTB, num(o.sizeTB))
+    }
     stats.rawTB = osdGroupsCapacity(bucket.osds)
   } else {
     for (const c of bucket.children) addStats(stats, bucketStats(c), int(c.count))
@@ -239,7 +245,7 @@ export function bucketStats(bucket: Bucket): TreeStats {
 }
 
 export function topologyStats(topology: Topology): TreeStats {
-  const stats: TreeStats = { counts: emptyCounts(), rawTB: 0, emptyBuckets: 0 }
+  const stats: TreeStats = { counts: emptyCounts(), rawTB: 0, emptyBuckets: 0, largestOsdTB: 0 }
   for (const b of topology) addStats(stats, bucketStats(b), int(b.count))
   return stats
 }

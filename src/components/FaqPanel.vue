@@ -177,6 +177,108 @@ import { FAQ_IDS } from '@/lib/faq'
           </ul>
         </div>
       </details>
+
+      <details :id="FAQ_IDS.iops" class="item">
+        <summary>
+          <AppIcon name="chevron" :size="14" class="caret" />
+          <span>How are the IOPS estimated?</span>
+        </summary>
+        <div class="answer">
+          <p>
+            From the 4k random read and write IOPS of a single OSD (step 5), the calculator estimates how many client
+            operations per second the pool handles before its busiest OSDs are saturated. Each client operation costs
+            OSD operations, depending on the pool layout:
+          </p>
+          <table class="costs">
+            <thead>
+              <tr>
+                <th scope="col">Layout</th>
+                <th scope="col">Client read</th>
+                <th scope="col">Client write</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <th scope="row">Replication, size n</th>
+                <td>1 read (primary)</td>
+                <td>n writes</td>
+              </tr>
+              <tr>
+                <th scope="row">EC k+m</th>
+                <td>k reads (k+m with <code>fast_read</code>)</td>
+                <td>k reads + k+m writes</td>
+              </tr>
+              <tr>
+                <th scope="row">EC k+m, optimized</th>
+                <td>1 read</td>
+                <td>min(1+m, k−1) reads + 1+m writes</td>
+              </tr>
+            </tbody>
+          </table>
+          <p>
+            Classic EC reads the whole stripe and rewrites all shards on a small write (read-modify-write). With
+            <code>allow_ec_optimizations</code> (step 4, Ceph Tentacle or later) Ceph reads only the needed shard and
+            updates just the changed data shard and the parity shards.
+          </p>
+
+          <p class="example-title">How the calculator computes it</p>
+          <pre class="formula">N_eff = capacity of all OSDs ÷ capacity of the largest OSD
+IOPS  = N_eff ÷ (reads ÷ R + writes ÷ W)</pre>
+          <dl class="terms">
+            <dt><code>R</code>, <code>W</code></dt>
+            <dd>4k random read and write IOPS of one OSD.</dd>
+            <dt><code>reads</code>, <code>writes</code></dt>
+            <dd>OSD operations per client operation, from the table above. Reads and writes share the OSD's time.</dd>
+            <dt><code>N_eff</code></dt>
+            <dd>
+              CRUSH spreads data, and with it the I/O, by capacity, so the largest OSDs get the most requests and
+              saturate first. With equal OSDs this is simply the number of OSDs.
+            </dd>
+          </dl>
+
+          <p class="example-title">Example: 12 OSDs, each 200 read and 200 write IOPS</p>
+          <table class="example">
+            <tbody>
+              <tr>
+                <th scope="row">Replication 3x</th>
+                <td><code>12 × 200 ÷ 1</code> · <code>12 ÷ (3 ÷ 200)</code></td>
+                <td class="num">2,400 / 800</td>
+              </tr>
+              <tr>
+                <th scope="row">EC 4+2</th>
+                <td><code>12 × 200 ÷ 4</code> · <code>12 ÷ (4 ÷ 200 + 6 ÷ 200)</code></td>
+                <td class="num">600 / 240</td>
+              </tr>
+              <tr>
+                <th scope="row">EC 4+2, optimized</th>
+                <td><code>12 × 200 ÷ 1</code> · <code>12 ÷ (3 ÷ 200 + 3 ÷ 200)</code></td>
+                <td class="num">2,400 / 400</td>
+              </tr>
+            </tbody>
+          </table>
+
+          <p class="example-title">Not included</p>
+          <ul>
+            <li>network bandwidth and latency, and the CPU of the OSD hosts;</li>
+            <li>
+              single-client performance: a client that waits for each request (queue depth 1) is limited by latency,
+              not by these numbers;
+            </li>
+            <li>recovery, backfill and scrubbing, which compete for the same OSDs;</li>
+            <li>
+              BlueStore overhead, unless the per-OSD values were measured on an OSD (e.g. with
+              <code>ceph tell osd.N bench</code>).
+            </li>
+          </ul>
+          <p class="tip">
+            <AppIcon name="sparkle" :size="14" />
+            <span>
+              EC optimizations need the jerasure or isa plugin with <code>reed_sol_van</code> and cannot be disabled
+              once set. Ceph recommends a <code>stripe_unit</code> of at least 16K for such pools.
+            </span>
+          </p>
+        </div>
+      </details>
     </div>
   </section>
 </template>
@@ -333,6 +435,32 @@ import { FAQ_IDS } from '@/lib/faq'
     font-weight: 700;
     color: var(--text);
     white-space: nowrap;
+  }
+}
+
+.costs {
+  width: 100%;
+  margin: 0 0 0.7rem;
+  border-collapse: collapse;
+  font-size: 0.84rem;
+
+  th,
+  td {
+    padding: 0.4rem 0.5rem;
+    border-top: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+    font-weight: 400;
+  }
+
+  thead th {
+    border-top: 0;
+    @include caption;
+    font-size: 0.74rem;
+  }
+
+  tbody th {
+    color: var(--text);
   }
 }
 

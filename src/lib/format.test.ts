@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatTB, formatTiB } from './format'
+import { formatIops, formatTB, formatTiB } from './format'
 import { parseDecimal, snapStep } from './stepping'
 
 describe('formatTB', () => {
@@ -20,6 +20,12 @@ describe('formatTiB', () => {
     expect(formatTiB(9070)).toBe('8.06 PiB')
     expect(formatTiB(0.001)).toBe('0.931 GiB')
     expect(formatTiB(0)).toBe('0 TiB')
+  })
+})
+
+describe('formatIops', () => {
+  it('keeps 3 significant digits in compact notation', () => {
+    expect([240, 800, 2400, 48_456, 1_234_567].map(formatIops)).toEqual(['240', '800', '2.4K', '48.5K', '1.23M'])
   })
 })
 

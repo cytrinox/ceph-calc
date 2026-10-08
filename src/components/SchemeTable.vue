@@ -3,7 +3,9 @@ import { computed } from 'vue'
 import AppIcon from './AppIcon.vue'
 import SchemeChart from './SchemeChart.vue'
 import { computeCapacity, placementHint, type CapacityInput, type Scheme, type Tunables } from '@/lib/ceph'
-import { formatInt, formatPct } from '@/lib/format'
+import { formatInt, formatIops, formatPct } from '@/lib/format'
+import { estimateIops, type IopsBasis } from '@/lib/iops'
+import type { PoolOptions } from '@/lib/pool'
 import { formatCapacity } from '@/lib/units'
 import { PRESETS, matchPreset, sameScheme, schemeLabel } from '@/lib/schemes'
 import { plural, type DomainType } from '@/lib/topology'
@@ -13,6 +15,9 @@ const props = defineProps<{
   tunables: Tunables
   current: Scheme
   domain: DomainType
+  /** Per-OSD IOPS basis; null hides the IOPS column. */
+  iops: IopsBasis | null
+  pool: PoolOptions
 }>()
 
 const emit = defineEmits<{ select: [scheme: Scheme] }>()
@@ -34,6 +39,7 @@ const rows = computed(() => {
       protectionShare: result.valid ? result.protectionTB / raw : 0,
       unusableShare: result.valid ? result.unusableTB / raw : 0,
       hint: placementHint(result, props.domain),
+      iops: props.iops && result.valid ? estimateIops(props.iops, s.scheme, props.pool) : null,
     }
   })
 })
@@ -44,17 +50,20 @@ const bestId = computed(() => {
   return valid.length ? valid.reduce((a, b) => (b.result.usableTB > a.result.usableTB ? b : a)).id : null
 })
 
+const iopsText = (n: number | null | undefined) => (n === null || n === undefined ? '—' : formatIops(n))
+
 function ariaLabel(row: (typeof rows.value)[number]): string {
   const r = row.result
   const d = props.domain
+  const iops = row.iops ? `, ${iopsText(row.iops.read)} read and ${iopsText(row.iops.write)} write IOPS` : ''
   return r.valid
-    ? `${row.label}: ${formatCapacity(r.usableTB)} usable, ${formatPct(r.efficiency)} efficiency, survives ${r.failuresTolerated} ${plural(d, r.failuresTolerated)}, needs ${r.minDomains} ${plural(d, r.minDomains)}`
+    ? `${row.label}: ${formatCapacity(r.usableTB)} usable, ${formatPct(r.efficiency)} efficiency${iops}, survives ${r.failuresTolerated} ${plural(d, r.failuresTolerated)}, needs ${r.minDomains} ${plural(d, r.minDomains)}`
     : `${row.label}: ${row.hint?.needs ?? 'not placeable'}${row.hint?.reserve ? ` (${row.hint.reserve})` : ''}`
 }
 </script>
 
 <template>
-  <section class="card schemes">
+  <section class="card schemes" :class="{ 'with-iops': iops }">
     <div class="card-head">
       <span class="icon-badge"><AppIcon name="columns" :size="17" /></span>
       <h2>Compare layouts</h2>
@@ -66,6 +75,7 @@ function ariaLabel(row: (typeof rows.value)[number]): string {
       <span>Raw split</span>
       <span class="num">Usable</span>
       <span class="num">Eff.</span>
+      <span v-if="iops" class="num" title="4k random read / write IOPS (cluster ceiling)">IOPS r / w</span>
       <span class="num">Survives</span>
       <span class="num">Needs</span>
     </div>
@@ -98,11 +108,16 @@ function ariaLabel(row: (typeof rows.value)[number]): string {
           </span>
           <span class="num usable">{{ row.result.valid ? formatCapacity(row.result.usableTB) : '—' }}</span>
           <span class="num eff">{{ row.result.valid ? formatPct(row.result.efficiency) : '—' }}</span>
+          <span v-if="iops" class="num iops">
+            <span>{{ iopsText(row.iops?.read) }}</span>
+            <span>{{ iopsText(row.iops?.write) }}</span>
+          </span>
           <span class="num survives">{{ row.result.failuresTolerated }}</span>
           <span class="num min">{{ formatInt(row.result.minDomains) }}</span>
           <span class="sub">
             survives {{ row.result.failuresTolerated }} · needs {{ formatInt(row.result.minDomains) }}
-            {{ plural(domain, row.result.minDomains) }}
+            {{ plural(domain, row.result.minDomains) }}<template v-if="row.iops">
+              · {{ iopsText(row.iops.read) }} / {{ iopsText(row.iops.write) }} IOPS</template>
           </span>
         </button>
       </li>
@@ -119,6 +134,8 @@ function ariaLabel(row: (typeof rows.value)[number]): string {
 
 <style lang="scss" scoped>
 $cols: minmax(9.5rem, 1.3fr) minmax(5rem, 1.4fr) 5.2rem 3.4rem 4.4rem 3.8rem;
+// With the IOPS column (read above write) after "Eff.".
+$cols-iops: minmax(9.5rem, 1.3fr) minmax(5rem, 1.4fr) 5.2rem 3.4rem 3.6rem 4.4rem 3.8rem;
 
 .hint {
   font-size: 0.78rem;
@@ -131,6 +148,10 @@ $cols: minmax(9.5rem, 1.3fr) minmax(5rem, 1.4fr) 5.2rem 3.4rem 4.4rem 3.8rem;
   grid-template-columns: $cols;
   gap: 0.9rem;
   align-items: center;
+
+  .with-iops & {
+    grid-template-columns: $cols-iops;
+  }
 }
 
 .cols {
@@ -279,10 +300,17 @@ $cols: minmax(9.5rem, 1.3fr) minmax(5rem, 1.4fr) 5.2rem 3.4rem 4.4rem 3.8rem;
 
 .eff,
 .survives,
-.min {
+.min,
+.iops {
   font-family: $font-mono;
   font-size: 0.82rem;
   color: var(--text-muted);
+}
+
+.iops {
+  display: grid;
+  line-height: 1.25;
+  font-size: 0.76rem;
 }
 
 .sub {
@@ -307,7 +335,9 @@ $cols: minmax(9.5rem, 1.3fr) minmax(5rem, 1.4fr) 5.2rem 3.4rem 4.4rem 3.8rem;
   }
 }
 
-@include below($bp-sm) {
+// Compact rows (name, usable and efficiency on top, the rest in a sub line) for cards too narrow
+// for all columns: phones, and the right-hand column at medium page widths.
+@mixin compact-rows {
   .cols {
     display: none;
   }
@@ -344,7 +374,8 @@ $cols: minmax(9.5rem, 1.3fr) minmax(5rem, 1.4fr) 5.2rem 3.4rem 4.4rem 3.8rem;
   }
 
   .survives,
-  .min {
+  .min,
+  .iops {
     display: none;
   }
 
@@ -354,7 +385,24 @@ $cols: minmax(9.5rem, 1.3fr) minmax(5rem, 1.4fr) 5.2rem 3.4rem 4.4rem 3.8rem;
     font-size: 0.72rem;
     color: var(--text-faint);
   }
+}
 
+.schemes {
+  container: schemes / inline-size;
+}
+
+@container schemes (max-width: 40rem) {
+  @include compact-rows;
+}
+
+// The IOPS column needs about 4.5rem more.
+@container schemes (max-width: 45rem) {
+  .with-iops {
+    @include compact-rows;
+  }
+}
+
+@include below($bp-sm) {
   .foot {
     padding: 0.3rem 1rem 1rem;
   }
