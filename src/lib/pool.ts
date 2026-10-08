@@ -127,8 +127,9 @@ export function isValidName(name: string): boolean {
   return NAME_PATTERN.test(name) && name.length <= 128
 }
 
+// The dash keeps k and m apart: without it EC 2+11 and EC 21+1 would both be "ec211".
 function schemeSlug(scheme: Scheme): string {
-  return scheme.kind === 'replicated' ? `rep${scheme.size}` : `ec${scheme.k}${scheme.m}`
+  return scheme.kind === 'replicated' ? `rep${scheme.size}` : `ec${scheme.k}-${scheme.m}`
 }
 
 export function defaultRuleName(scheme: Scheme, domain: DomainType, deviceClass: DeviceClass): string {

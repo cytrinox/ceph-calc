@@ -17,7 +17,10 @@ const ec42 = { kind: 'ec', k: 4, m: 2 } as const
 describe('pool options', () => {
   it('derives rule and profile names from scheme, domain and device class', () => {
     expect(defaultRuleName(rep3, 'host', '')).toBe('rep3_host')
-    expect(defaultRuleName(ec42, 'rack', 'nvme')).toBe('ec42_rack_nvme')
+    expect(defaultRuleName(ec42, 'rack', 'nvme')).toBe('ec4-2_rack_nvme')
+    expect(defaultRuleName({ kind: 'ec', k: 2, m: 11 }, 'host', '')).not.toBe(
+      defaultRuleName({ kind: 'ec', k: 21, m: 1 }, 'host', ''),
+    )
     expect(defaultProfileName(ec42, 'host', 'hdd')).toBe('ec-4-2-host-hdd')
     expect(defaultProfileName(rep3, 'host', '')).toBe('')
     const pool = { ...defaultPoolOptions(), crushRule: 'fast' }

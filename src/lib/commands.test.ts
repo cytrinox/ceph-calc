@@ -47,8 +47,8 @@ describe('buildCommands', () => {
     expect(s).toContain(
       'ceph osd erasure-code-profile set ec-4-2-rack-nvme \\\n    k=4 m=2 \\\n    plugin=jerasure technique=cauchy_good \\\n    stripe_unit=1M \\\n    crush-root=default crush-failure-domain=rack crush-device-class=nvme',
     )
-    expect(s).toContain('ceph osd crush rule create-erasure ec42_rack_nvme ec-4-2-rack-nvme')
-    expect(s).toContain('erasure ec-4-2-rack-nvme ec42_rack_nvme')
+    expect(s).toContain('ceph osd crush rule create-erasure ec4-2_rack_nvme ec-4-2-rack-nvme')
+    expect(s).toContain('erasure ec-4-2-rack-nvme ec4-2_rack_nvme')
     expect(s).toContain('ceph osd pool set vms min_size 5')
     expect(s).toContain('ceph osd pool set vms allow_ec_overwrites true')
     expect(s).toContain('ceph osd pool set vms fast_read 1')
