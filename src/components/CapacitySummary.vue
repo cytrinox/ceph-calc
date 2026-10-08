@@ -112,14 +112,14 @@ const usableParts = computed(() => {
         </dl>
         <dl v-if="iops" class="kpi">
           <div class="half" :title="IOPS_TITLE">
-            <dt><AppIcon name="download" :size="14" /> Read IOPS</dt>
+            <dt><AppIcon name="disk-read" :size="14" /> Read IOPS</dt>
             <dd>
               <strong>{{ iopsValue(iops.read) }}</strong>
               <span>{{ iopsNote(iops.read, iops.costs.read, 'read') }}</span>
             </dd>
           </div>
           <div class="half" :title="IOPS_TITLE">
-            <dt><AppIcon name="upload" :size="14" /> Write IOPS</dt>
+            <dt><AppIcon name="disk-write" :size="14" /> Write IOPS</dt>
             <dd>
               <strong>{{ iopsValue(iops.write) }}</strong>
               <span>{{ iopsNote(iops.write, iops.costs.write, 'write') }}</span>
