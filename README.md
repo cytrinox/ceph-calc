@@ -13,8 +13,9 @@ Source: <https://github.com/cytrinox/ceph-calc>
   hosts contain one or more OSD groups (`count × size`). Any bucket type can be the failure domain.
   **Examples** (from a small 4-host cluster to two datacenters) load a complete setup: topology, failure domain,
   pool layout, recovery reserve and Ceph's default fill ratios.
-- Price: price per TB of raw drive capacity (default 500) with a free-text currency (`EUR`, `$`, `USD`, …);
-  the Real net capacity card shows the cluster's drive cost and the cost per usable TB.
+- Miscellaneous (step 5, optional): a price per TB of raw drive capacity, empty by default, with a free-text
+  currency that starts as the browser locale's symbol (`€`, `$`, `£`, `CHF`, …); once a price is set, the Real
+  net capacity card shows the cluster's drive cost and the cost per usable TB.
 - Pool schemes: replication (`size`, `min_size`) or erasure coding (`k`, `m`), with common presets.
 - Headroom: recovery reserve (free space to recover the data of N failed failure domains, capped at the
   spare domains = domains − copies/shards per object) and the nearfull (0.85), backfillfull (0.90) and full
@@ -26,7 +27,7 @@ Source: <https://github.com/cytrinox/ceph-calc>
   compression ratio, default 0.90, shown as an effective-capacity badge), quotas, and the `nodelete` /
   `nosizechange` flags. Leave the rule or profile name empty to get a derived name such as `rep3_host`
   or `ec-4-2-rack-nvme`.
-- IOPS (step 5, optional): a client I/O size (4K–1M) and the random read and write IOPS of one OSD at that
+- IOPS (also step 5, optional): a client I/O size (4K–1M) and the random read and write IOPS of one OSD at that
   size give an estimated cluster ceiling for the selected layout (result card, with the arithmetic in the
   tooltip) and for every preset (comparison table).
 - Raw data distribution bar: usable data, protection overhead, reserved headroom (kept free on purpose) and,

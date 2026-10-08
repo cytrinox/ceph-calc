@@ -25,6 +25,8 @@ const props = withDefaults(
      * one step, while typed values may be anything down to `min`.
      */
     snap?: boolean
+    /** 0 means "not set": show an empty field with a dash placeholder; clearing the field sets 0. */
+    blankZero?: boolean
   }>(),
   { step: 1, integer: true },
 )
@@ -48,6 +50,7 @@ function clamp(value: number): number {
 function format(value: number): string {
   const n = Number(value)
   if (!Number.isFinite(n)) return ''
+  if (props.blankZero && n === 0) return ''
   if (props.decimals === undefined) return String(n)
   const fixed = n.toFixed(props.decimals)
   // Show at least `decimals`, but keep extra typed digits (up to `precision`) instead of rounding them away.
@@ -70,6 +73,10 @@ function onFocus() {
 function onInput(event: Event) {
   const input = event.target as HTMLInputElement
   draft.value = input.value
+  if (props.blankZero && input.value.trim() === '') {
+    model.value = 0
+    return
+  }
   const value = parseDecimal(input.value)
   if (Number.isFinite(value)) model.value = clamp(value)
 }
@@ -159,6 +166,7 @@ const atMax = computed(() => props.max !== undefined && model.value >= props.max
           :aria-valuemax="max"
           autocomplete="off"
           spellcheck="false"
+          :placeholder="blankZero ? '—' : undefined"
           :value="display"
           @focus="onFocus"
           @input="onInput"

@@ -94,7 +94,7 @@ const hardwareSummary = computed(() => {
     st.tab === 'basic'
       ? `${formatInt(st.basic.hosts)} hosts × ${st.basic.osdsPerHost} × ${st.basic.osdSizeTB} TB`
       : `custom tree · ${formatInt(props.osdCount)} OSDs`
-  return st.pricePerTB > 0 ? `${topo} · ${formatPrice(st.pricePerTB, st.currency)}/TB` : topo
+  return topo
 })
 const redundancySummary = computed(() => `${schemeLabel(props.state.scheme)} · across ${plural(domain.value)}`)
 const headroomSummary = computed(() => {
@@ -106,11 +106,14 @@ const poolSummary = computed(() => {
   const pool = props.state.pool
   return `${pool.name || 'data'} · ${pool.application} · autoscale ${pool.autoscaleMode}`
 })
-const iopsSummary = computed(() => {
-  const { osdReadIops: r, osdWriteIops: w } = props.state
-  if (!(r > 0) && !(w > 0)) return 'not set'
+const miscSummary = computed(() => {
+  const st = props.state
+  const { osdReadIops: r, osdWriteIops: w } = st
   const value = (n: number) => (n > 0 ? formatIops(n) : '—')
-  return `${ioSizeLabel(props.state.ioSizeKiB)} · read ${value(r)} · write ${value(w)} IOPS per OSD`
+  const price = st.pricePerTB > 0 ? `${formatPrice(st.pricePerTB, st.currency)}/TB` : 'no price'
+  const iops =
+    r > 0 || w > 0 ? `${ioSizeLabel(st.ioSizeKiB)} · read ${value(r)} · write ${value(w)} IOPS per OSD` : 'no IOPS'
+  return `${price} · ${iops}`
 })
 
 /** Failure domains beyond what one object needs: the most the recovery reserve can cover. */
@@ -134,33 +137,6 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
         @reset-from-basic="emit('resetFromBasic')"
         @example-loaded="applyExample"
       />
-
-      <div class="pricing">
-        <h4>Price</h4>
-        <NumberField
-          v-model="state.pricePerTB"
-          label="Price per TB"
-          hint="Raw drive capacity, decimal TB. Click the currency to change it."
-          :min="0"
-          :max="1000000"
-          :step="10"
-          :precision="2"
-          :integer="false"
-        >
-          <template #unit>
-            <input
-              v-model.trim="state.currency"
-              class="currency"
-              type="text"
-              :maxlength="CURRENCY_MAX_LENGTH"
-              aria-label="Currency"
-              title="Currency: any text, e.g. EUR, $, USD"
-              autocomplete="off"
-              spellcheck="false"
-            />
-          </template>
-        </NumberField>
-      </div>
     </StepSection>
 
     <StepSection :num="2" collapsed-by-default title="Redundancy" subtitle="How copies or chunks are stored and spread" :summary="redundancySummary">
@@ -295,8 +271,37 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
       />
     </StepSection>
 
-    <StepSection :num="5" collapsed-by-default title="IOPS" subtitle="Per-OSD IOPS for a performance estimate" :summary="iopsSummary">
-      <div class="stack">
+    <StepSection :num="5" collapsed-by-default title="Miscellaneous" subtitle="Optional: drive price and IOPS for cost and performance estimates" :summary="miscSummary">
+      <div class="misc-group">
+        <h4>Price</h4>
+        <NumberField
+          v-model="state.pricePerTB"
+          label="Price per TB"
+          hint="Raw drive capacity, decimal TB. Click the currency to change it."
+          :min="0"
+          :max="1000000"
+          :step="10"
+          :precision="2"
+          :integer="false"
+          blank-zero
+        >
+          <template #unit>
+            <input
+              v-model.trim="state.currency"
+              class="currency"
+              type="text"
+              :maxlength="CURRENCY_MAX_LENGTH"
+              aria-label="Currency"
+              title="Currency: any text, e.g. €, $, EUR, USD"
+              autocomplete="off"
+              spellcheck="false"
+            />
+          </template>
+        </NumberField>
+      </div>
+
+      <div class="misc-group">
+        <h4>IOPS</h4>
         <label class="select-field">
           <span class="label">Client I/O size</span>
           <select v-model.number="state.ioSizeKiB">
@@ -311,6 +316,7 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
           :min="0"
           :max="MAX_OSD_IOPS"
           :step="100"
+          blank-zero
         >
           <template #label-after>
             <FaqLink :target="FAQ_IDS.iops" topic="the IOPS estimate" />
@@ -323,11 +329,12 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
           :min="0"
           :max="MAX_OSD_IOPS"
           :step="100"
+          blank-zero
         />
         <p class="measure">
           Measure on the OSD itself with this block size (e.g. fio with
           <code>bs={{ ioSizeLabel(state.ioSizeKiB).toLowerCase() }}</code> against an OSD, or
-          <code>ceph tell osd.N bench</code> for writes), so BlueStore overhead is included. Leave both at 0 to hide the
+          <code>ceph tell osd.N bench</code> for writes), so BlueStore overhead is included. Leave both empty to hide the
           estimate.
         </p>
       </div>
@@ -377,12 +384,15 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
   }
 }
 
-.pricing {
+.misc-group {
   display: grid;
   gap: 0.8rem;
-  margin-top: 1.1rem;
-  padding-top: 1rem;
-  border-top: 1px dashed var(--border-strong);
+
+  & + & {
+    margin-top: 1.1rem;
+    padding-top: 1rem;
+    border-top: 1px dashed var(--border-strong);
+  }
 
   h4 {
     margin: 0;

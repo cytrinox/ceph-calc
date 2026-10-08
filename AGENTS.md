@@ -79,7 +79,9 @@ real net = placeable(domains − N largest) × nearfull × f
   - EC uses Ceph's default `k + min(1, m − 1)` (`schemeMinSize`).
 - **"Not enough failure domains" wording** comes from `placementHint()` / `placementMessage()` only (e.g. "needs 8
   hosts (+ 2 recovery reserve)"). Don't build such sentences elsewhere.
-- **First visit:** Replication 3x, recovery reserve 0, ratios 0.85 / 0.90 / 0.95, price 500 EUR/TB, no IOPS.
+- **First visit:** Replication 3x, recovery reserve 0, ratios 0.85 / 0.90 / 0.95, no price and no IOPS (step 5
+  "Miscellaneous"; empty `NumberField`s with `blank-zero` mean "not set"). The currency starts as the browser
+  locale's symbol (`localCurrency()` in `pricing.ts`).
 
 ## IOPS estimate (`src/lib/iops.ts`)
 

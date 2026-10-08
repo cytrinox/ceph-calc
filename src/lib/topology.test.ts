@@ -153,7 +153,7 @@ describe('topology', () => {
   })
 
   it('stores the price per TB in shared links', () => {
-    expect(defaultState().pricePerTB).toBe(500)
+    expect(defaultState().pricePerTB).toBe(0)
     const state = defaultState()
     state.pricePerTB = 650
     expect(decodeState(encodeState(state))!.pricePerTB).toBe(650)

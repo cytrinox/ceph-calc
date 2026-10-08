@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clusterPrice, formatPrice, pricePerUsableTB } from './pricing'
+import { clusterPrice, formatPrice, localCurrency, pricePerUsableTB } from './pricing'
 
 describe('pricing', () => {
   it('prices raw capacity per decimal TB', () => {
@@ -7,6 +7,13 @@ describe('pricing', () => {
     expect(clusterPrice(0.001, 500)).toBeCloseTo(0.5, 9)
     expect(pricePerUsableTB(160000, 90.667)).toBeCloseTo(1764.7, 1)
     expect(pricePerUsableTB(160000, 0)).toBeNull()
+  })
+
+  it('derives the default currency from the locale', () => {
+    expect(['de-DE', 'de', 'de-AT', 'fr-FR'].map((l) => localCurrency(l))).toEqual(['€', '€', '€', '€'])
+    expect(['en-US', 'en-GB', 'de-CH', 'pl-PL', 'hi-IN'].map((l) => localCurrency(l))).toEqual(['$', '£', 'CHF', 'zł', '₹'])
+    // unknown region: the euro
+    expect(localCurrency('xx-ZZ')).toBe('€')
   })
 
   it('formats with the user currency text', () => {

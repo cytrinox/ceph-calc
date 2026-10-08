@@ -14,7 +14,7 @@ import {
   type PoolOptions,
 } from './pool'
 import { DEFAULT_RATIOS, type Scheme } from './ceph'
-import { CURRENCY_MAX_LENGTH, DEFAULT_CURRENCY, DEFAULT_PRICE_PER_TB } from './pricing'
+import { CURRENCY_MAX_LENGTH, DEFAULT_PRICE_PER_TB, localCurrency } from './pricing'
 import { DEFAULT_IO_SIZE_KIB, IO_SIZES_KIB, MAX_OSD_IOPS } from './iops'
 import {
   ALL_DOMAIN_TYPES,
@@ -66,7 +66,7 @@ export function defaultState(): AppState {
     recoveryReserve: 0,
     pool: defaultPoolOptions(),
     pricePerTB: DEFAULT_PRICE_PER_TB,
-    currency: DEFAULT_CURRENCY,
+    currency: localCurrency(),
     osdReadIops: 0,
     osdWriteIops: 0,
     ioSizeKiB: DEFAULT_IO_SIZE_KIB,
