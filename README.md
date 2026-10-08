@@ -35,6 +35,7 @@ Source: <https://github.com/cytrinox/ceph-calc>
   `min_size` Ceph sets on creation.
 - Light/dark theme, responsive single-column layout on phones, and configuration stored in the URL hash;
   the **Share** button copies that link (or opens the native share sheet on phones).
+- Link previews (Open Graph / X card) with a screenshot of the calculator.
 - **TB / TiB** switch for all results (bar, tables, chart, warnings). Inputs such as OSD sizes stay in decimal TB,
   as drives are sold that way; TiB matches what `ceph df` reports.
 - FAQ panel: why the real net capacity is lower than on other calculators (with the formula and worked
@@ -91,6 +92,10 @@ podman run --rm -p 8080:8080 ceph-calc
 ```
 
 `docker build -f Containerfile .` works the same way.
+
+The link-preview tags (`og:url`, `og:image`) need absolute URLs; nginx fills in the scheme and host of each request.
+Behind a reverse proxy, pass the original `Host` header (the default in Traefik, Caddy and ingress-nginx; plain
+nginx needs `proxy_set_header Host $host`) and `X-Forwarded-Proto` for https.
 
 ## Continuous integration
 
