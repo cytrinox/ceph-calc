@@ -22,7 +22,7 @@ describe('computeCapacity', () => {
     expect(r.minDomains).toBe(4)
     expect(r.protectionTB).toBeCloseTo(145.07, 1)
     expect(r.reserved.healTB).toBe(64)
-    expect(r.reserved.fullMarginTB).toBeCloseTo(38.4, 6)
+    expect(r.reserved.nearfullHeadroomTB).toBeCloseTo(38.4, 6)
     expect(r.usableTB + r.protectionTB + r.reservedTB).toBeCloseTo(r.rawTB, 6)
   })
 

@@ -60,7 +60,7 @@ const breakdown = computed(() => {
   const n = props.healDomains
   return [
     { label: `Recovery reserve (${n} ${plural(props.domain, n)})`, tb: r.healTB },
-    { label: `Nearfull headroom (${formatPct(1 - props.result.fillRatios.nearfull)})`, tb: r.fullMarginTB },
+    { label: `Nearfull headroom (${formatPct(1 - props.result.fillRatios.nearfull)})`, tb: r.nearfullHeadroomTB },
     { label: 'Stranded by imbalance', tb: r.strandedTB },
     { label: 'Outside failure domains', tb: r.unplacedTB },
   ].filter((b) => b.tb > 1e-9)

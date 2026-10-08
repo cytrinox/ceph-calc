@@ -36,7 +36,7 @@ export interface CapacityInput {
 export interface ReservedBreakdown {
   healTB: number
   strandedTB: number
-  fullMarginTB: number
+  nearfullHeadroomTB: number
   unplacedTB: number
 }
 
@@ -167,7 +167,7 @@ export function computeCapacity(input: CapacityInput, scheme: Scheme, tunables: 
       usableTB: 0,
       protectionTB: 0,
       reservedTB: rawTB,
-      reserved: { healTB: 0, strandedTB: 0, fullMarginTB: 0, unplacedTB: input.unplacedTB },
+      reserved: { healTB: 0, strandedTB: 0, nearfullHeadroomTB: 0, unplacedTB: input.unplacedTB },
       healthyFill: 0,
       healthyPlaceableTB: 0,
       efficiency: 0,
@@ -190,7 +190,7 @@ export function computeCapacity(input: CapacityInput, scheme: Scheme, tunables: 
   const reserved = {
     healTB,
     strandedTB: Math.max(0, remainingTB - placeableTB),
-    fullMarginTB: placeableTB - writableTB,
+    nearfullHeadroomTB: placeableTB - writableTB,
     unplacedTB: input.unplacedTB,
   }
   const usableTB = writableTB * dataFraction
@@ -201,7 +201,7 @@ export function computeCapacity(input: CapacityInput, scheme: Scheme, tunables: 
     valid: true,
     usableTB,
     protectionTB,
-    reservedTB: reserved.healTB + reserved.strandedTB + reserved.fullMarginTB + reserved.unplacedTB,
+    reservedTB: reserved.healTB + reserved.strandedTB + reserved.nearfullHeadroomTB + reserved.unplacedTB,
     reserved,
     healthyFill: healthyPlaceableTB > 0 ? writableTB / healthyPlaceableTB : 0,
     healthyPlaceableTB,
