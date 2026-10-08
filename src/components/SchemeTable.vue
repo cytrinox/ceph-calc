@@ -4,7 +4,7 @@ import AppIcon from './AppIcon.vue'
 import SchemeChart from './SchemeChart.vue'
 import { computeCapacity, placementHint, type CapacityInput, type Scheme, type Tunables } from '@/lib/ceph'
 import { formatInt, formatIops, formatPct } from '@/lib/format'
-import { estimateIops, type IopsBasis } from '@/lib/iops'
+import { estimateIops, ioSizeLabel, type IopsBasis } from '@/lib/iops'
 import type { PoolOptions } from '@/lib/pool'
 import { formatCapacity } from '@/lib/units'
 import { PRESETS, matchPreset, sameScheme, schemeLabel } from '@/lib/schemes'
@@ -75,7 +75,7 @@ function ariaLabel(row: (typeof rows.value)[number]): string {
       <span>Raw split</span>
       <span class="num">Usable</span>
       <span class="num">Eff.</span>
-      <span v-if="iops" class="num" title="4k random read / write IOPS (cluster ceiling)">IOPS r / w</span>
+      <span v-if="iops" class="num" :title="`${ioSizeLabel(iops.ioSizeKiB)} random read / write IOPS (cluster ceiling)`">IOPS r / w</span>
       <span class="num">Survives</span>
       <span class="num">Needs</span>
     </div>

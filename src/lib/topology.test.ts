@@ -180,8 +180,11 @@ describe('topology', () => {
     expect(encodeState(state)).toBe(encodeState(decodeState(encodeState(state))!))
     state.osdReadIops = 5000
     state.osdWriteIops = 99_000_000
+    state.ioSizeKiB = 64
     const decoded = decodeState(encodeState(state))!
-    expect([decoded.osdReadIops, decoded.osdWriteIops]).toEqual([5000, 10_000_000])
+    expect([decoded.osdReadIops, decoded.osdWriteIops, decoded.ioSizeKiB]).toEqual([5000, 10_000_000, 64])
+    state.ioSizeKiB = 12 // not a supported size
+    expect(decodeState(encodeState(state))!.ioSizeKiB).toBe(4)
   })
 
   it('clamps all ratios to 0–1 when encoding a link', () => {

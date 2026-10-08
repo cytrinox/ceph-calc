@@ -13,7 +13,7 @@ import TabGroup from './TabGroup.vue'
 import { DEFAULT_RATIOS, ratiosOrdered, schemeMinSize } from '@/lib/ceph'
 import { CUSTOM_EC, CUSTOM_REPLICATED, DEFAULT_PRESET_ID, PRESETS, schemeLabel, schemeSelection } from '@/lib/schemes'
 import { formatInt, formatIops } from '@/lib/format'
-import { MAX_OSD_IOPS } from '@/lib/iops'
+import { IO_SIZES_KIB, MAX_OSD_IOPS, ioSizeLabel } from '@/lib/iops'
 import { CURRENCY_MAX_LENGTH, formatPrice } from '@/lib/pricing'
 import { TYPE_ID, plural, type DomainType, type TopologyExample } from '@/lib/topology'
 import type { AppState, TopologyTab } from '@/lib/urlState'
@@ -110,7 +110,7 @@ const iopsSummary = computed(() => {
   const { osdReadIops: r, osdWriteIops: w } = props.state
   if (!(r > 0) && !(w > 0)) return 'not set'
   const value = (n: number) => (n > 0 ? formatIops(n) : '—')
-  return `read ${value(r)} · write ${value(w)} IOPS per OSD`
+  return `${ioSizeLabel(props.state.ioSizeKiB)} · read ${value(r)} · write ${value(w)} IOPS per OSD`
 })
 
 /** Failure domains beyond what one object needs: the most the recovery reserve can cover. */
@@ -295,12 +295,19 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
       />
     </StepSection>
 
-    <StepSection :num="5" collapsed-by-default title="IOPS" subtitle="Per-OSD 4k IOPS for a performance estimate" :summary="iopsSummary">
+    <StepSection :num="5" collapsed-by-default title="IOPS" subtitle="Per-OSD IOPS for a performance estimate" :summary="iopsSummary">
       <div class="stack">
+        <label class="select-field">
+          <span class="label">Client I/O size</span>
+          <select v-model.number="state.ioSizeKiB">
+            <option v-for="kib in IO_SIZES_KIB" :key="kib" :value="kib">{{ ioSizeLabel(kib) }} random I/O</option>
+          </select>
+          <span class="hint">Size of each client request; enter the per-OSD IOPS for this size</span>
+        </label>
         <NumberField
           v-model="state.osdReadIops"
           label="Read IOPS"
-          hint="4k random reads one OSD sustains"
+          :hint="`${ioSizeLabel(state.ioSizeKiB)} random reads one OSD sustains`"
           :min="0"
           :max="MAX_OSD_IOPS"
           :step="100"
@@ -312,14 +319,16 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
         <NumberField
           v-model="state.osdWriteIops"
           label="Write IOPS"
-          hint="4k random writes one OSD sustains"
+          :hint="`${ioSizeLabel(state.ioSizeKiB)} random writes one OSD sustains`"
           :min="0"
           :max="MAX_OSD_IOPS"
           :step="100"
         />
         <p class="measure">
-          Measure on the OSD itself (e.g. <code>ceph tell osd.N bench</code> for writes, or fio against an OSD), so
-          BlueStore overhead is included. Leave both at 0 to hide the estimate.
+          Measure on the OSD itself with this block size (e.g. fio with
+          <code>bs={{ ioSizeLabel(state.ioSizeKiB).toLowerCase() }}</code> against an OSD, or
+          <code>ceph tell osd.N bench</code> for writes), so BlueStore overhead is included. Leave both at 0 to hide the
+          estimate.
         </p>
       </div>
     </StepSection>

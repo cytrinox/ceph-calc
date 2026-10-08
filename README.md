@@ -26,8 +26,9 @@ Source: <https://github.com/cytrinox/ceph-calc>
   compression ratio, default 0.90, shown as an effective-capacity badge), quotas, and the `nodelete` /
   `nosizechange` flags. Leave the rule or profile name empty to get a derived name such as `rep3_host`
   or `ec-4-2-rack-nvme`.
-- IOPS (step 5, optional): 4k random read and write IOPS per OSD give an estimated cluster ceiling for the
-  selected layout (result card) and for every preset (comparison table).
+- IOPS (step 5, optional): a client I/O size (4K–1M) and the random read and write IOPS of one OSD at that
+  size give an estimated cluster ceiling for the selected layout (result card, with the arithmetic in the
+  tooltip) and for every preset (comparison table).
 - Raw data distribution bar: usable data, protection overhead, reserved headroom (kept free on purpose) and,
   when there is any, unusable space (yellow; can never be filled), with markers where a healthy cluster
   reaches the nearfull, backfillfull and full ratios. Below the usable share, `+X until backfillfull` /
@@ -83,15 +84,17 @@ For a uniform cluster this reduces to `raw × (D − N)/D × nearfull × f`, whe
 
 ### IOPS estimate
 
-OSD operations per 4k client operation:
+OSD operations per client operation, with `d = min(k, ⌈I/O size ÷ stripe_unit⌉)` data shards touched
+(requests aligned to their size):
 
 | Layout | Client read | Client write |
 | --- | --- | --- |
 | Replication, `size` n | 1 read | n writes |
 | EC k+m | k reads (k+m with `fast_read`) | k reads + k+m writes (read-modify-write) |
-| EC k+m with `allow_ec_optimizations` | 1 read | min(1+m, k−1) reads + 1+m writes |
+| EC k+m with `allow_ec_optimizations` | d reads | min(d+m, k−d) reads + d+m writes |
+| EC, whole stripes (a multiple of k × `stripe_unit`) | | k+m writes, no reads |
 
-With `R` / `W` the per-OSD read / write IOPS, `N_eff = placed capacity ÷ largest OSD` (CRUSH spreads I/O by
+With `R` / `W` the per-OSD read / write IOPS at the I/O size, `N_eff = placed capacity ÷ largest OSD` (CRUSH spreads I/O by
 capacity, so the largest OSDs saturate first; equal OSDs give the OSD count) and `IOPS = N_eff ÷ (reads ÷ R +
 writes ÷ W)`. It is a ceiling for a healthy cluster with many parallel requests; network, CPU, latency, recovery
 and scrubbing are not modelled.

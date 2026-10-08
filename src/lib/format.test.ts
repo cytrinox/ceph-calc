@@ -25,7 +25,7 @@ describe('formatTiB', () => {
 
 describe('formatIops', () => {
   it('keeps 3 significant digits in compact notation', () => {
-    expect([240, 800, 2400, 48_456, 1_234_567].map(formatIops)).toEqual(['240', '800', '2.4K', '48.5K', '1.23M'])
+    expect([57.14, 240, 800, 2400, 48_456, 1_234_567].map(formatIops)).toEqual(['57', '240', '800', '2.4K', '48.5K', '1.23M'])
   })
 })
 

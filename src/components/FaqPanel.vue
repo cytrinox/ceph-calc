@@ -185,9 +185,9 @@ import { FAQ_IDS } from '@/lib/faq'
         </summary>
         <div class="answer">
           <p>
-            From the 4k random read and write IOPS of a single OSD (step 5), the calculator estimates how many client
-            operations per second the pool handles before its busiest OSDs are saturated. Each client operation costs
-            OSD operations, depending on the pool layout:
+            From the random read and write IOPS of a single OSD at the chosen client I/O size (step 5), the calculator
+            estimates how many client operations per second the pool handles before its busiest OSDs are saturated.
+            Each client operation costs OSD operations, depending on the pool layout:
           </p>
           <table class="costs">
             <thead>
@@ -210,15 +210,28 @@ import { FAQ_IDS } from '@/lib/faq'
               </tr>
               <tr>
                 <th scope="row">EC k+m, optimized</th>
-                <td>1 read</td>
-                <td>min(1+m, k−1) reads + 1+m writes</td>
+                <td>d reads</td>
+                <td>min(d+m, k−d) reads + d+m writes</td>
+              </tr>
+              <tr>
+                <th scope="row">EC, whole stripes</th>
+                <td></td>
+                <td>k+m writes, no reads</td>
               </tr>
             </tbody>
           </table>
           <p>
             Classic EC reads the whole stripe and rewrites all shards on a small write (read-modify-write). With
-            <code>allow_ec_optimizations</code> (step 4, Ceph Tentacle or later) Ceph reads only the needed shard and
-            updates just the changed data shard and the parity shards.
+            <code>allow_ec_optimizations</code> (step 4, Ceph Tentacle or later) Ceph reads only the shards holding
+            the data and updates just the changed data shards and the parity shards, using whichever of parity-delta
+            or partial writes reads less.
+          </p>
+          <p>
+            <code>d</code> is the number of data shards a request touches: ⌈I/O size ÷ <code>stripe_unit</code>⌉, at
+            most k. A 4K request always fits into one strip (<code>d</code> = 1); a 64K request with a 16K
+            <code>stripe_unit</code> touches 4 shards. A request covering whole stripes (a multiple of
+            k × <code>stripe_unit</code>) is written without reading. That is why Ceph recommends a
+            <code>stripe_unit</code> of at least 16K with EC optimizations: medium-sized requests touch fewer shards.
           </p>
 
           <p class="example-title">How the calculator computes it</p>
@@ -226,7 +239,7 @@ import { FAQ_IDS } from '@/lib/faq'
 IOPS  = N_eff ÷ (reads ÷ R + writes ÷ W)</pre>
           <dl class="terms">
             <dt><code>R</code>, <code>W</code></dt>
-            <dd>4k random read and write IOPS of one OSD.</dd>
+            <dd>Random read and write IOPS of one OSD at the chosen I/O size.</dd>
             <dt><code>reads</code>, <code>writes</code></dt>
             <dd>OSD operations per client operation, from the table above. Reads and writes share the OSD's time.</dd>
             <dt><code>N_eff</code></dt>
@@ -236,7 +249,7 @@ IOPS  = N_eff ÷ (reads ÷ R + writes ÷ W)</pre>
             </dd>
           </dl>
 
-          <p class="example-title">Example: 12 OSDs, each 200 read and 200 write IOPS</p>
+          <p class="example-title">Example: 12 OSDs, each 200 read and 200 write IOPS at 4K</p>
           <table class="example">
             <tbody>
               <tr>
@@ -257,6 +270,18 @@ IOPS  = N_eff ÷ (reads ÷ R + writes ÷ W)</pre>
             </tbody>
           </table>
 
+          <p class="example-title">Assumptions</p>
+          <ul>
+            <li>
+              the per-OSD IOPS are measured on an OSD at the chosen I/O size (e.g. fio, or
+              <code>ceph tell osd.N bench</code> for writes), so BlueStore overhead is included;
+            </li>
+            <li>
+              requests are aligned to their size; strips of one shard that a request touches count as one operation,
+              and shard operations smaller than the request count as full operations (slightly conservative).
+            </li>
+          </ul>
+
           <p class="example-title">Not included</p>
           <ul>
             <li>network bandwidth and latency, and the CPU of the OSD hosts;</li>
@@ -264,11 +289,7 @@ IOPS  = N_eff ÷ (reads ÷ R + writes ÷ W)</pre>
               single-client performance: a client that waits for each request (queue depth 1) is limited by latency,
               not by these numbers;
             </li>
-            <li>recovery, backfill and scrubbing, which compete for the same OSDs;</li>
-            <li>
-              BlueStore overhead, unless the per-OSD values were measured on an OSD (e.g. with
-              <code>ceph tell osd.N bench</code>).
-            </li>
+            <li>recovery, backfill and scrubbing, which compete for the same OSDs.</li>
           </ul>
           <p>
             The estimate assumes the drives are the limit. That makes the numbers for optimized EC pools an upper bound:

@@ -23,9 +23,10 @@ export function formatPct(fraction: number): string {
 const intFormat = new Intl.NumberFormat('en-US')
 const iopsFormat = new Intl.NumberFormat('en-US', { notation: 'compact', maximumSignificantDigits: 3 })
 
-/** IOPS with 3 significant digits: 240, 2.4K, 48.5K, 1.23M. */
+/** IOPS as whole numbers below 1,000, else 3 significant digits: 57, 240, 2.4K, 48.5K, 1.23M. */
 export function formatIops(n: number): string {
-  return Number.isFinite(n) ? iopsFormat.format(n) : '—'
+  if (!Number.isFinite(n)) return '—'
+  return n < 999.5 ? formatInt(Math.round(n)) : iopsFormat.format(n)
 }
 
 export function formatInt(n: number): string {

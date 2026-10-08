@@ -1,4 +1,5 @@
-// Rough 4k random IOPS ceiling of a pool, from the read and write IOPS a single OSD sustains.
+// Rough random IOPS ceiling of a pool for one client I/O size, from the read and write IOPS a single
+// OSD sustains at that size.
 
 import type { Scheme } from './ceph'
 import { formatInt } from './format'
@@ -7,7 +8,16 @@ import type { PoolOptions } from './pool'
 /** Upper bound for the per-OSD inputs (also used for shared links). */
 export const MAX_OSD_IOPS = 10_000_000
 
-/** 4k random IOPS one OSD sustains; 0 = not set. */
+/** Client I/O sizes the estimate supports, in KiB. */
+export const IO_SIZES_KIB = [4, 8, 16, 32, 64, 128, 256, 512, 1024] as const
+export const DEFAULT_IO_SIZE_KIB = 4
+
+/** "4K", "64K", "1M". */
+export function ioSizeLabel(kib: number): string {
+  return kib >= 1024 && kib % 1024 === 0 ? `${kib / 1024}M` : `${kib}K`
+}
+
+/** Random IOPS one OSD sustains at the chosen I/O size; 0 = not set. */
 export interface OsdIops {
   read: number
   write: number
@@ -24,24 +34,39 @@ export interface OpCosts {
   write: OpCost
 }
 
+export type IopsPoolOptions = Pick<PoolOptions, 'fastRead' | 'ecOptimizations' | 'stripeUnitKiB'>
+
 /**
- * OSD reads and writes per 4k client read / write:
+ * OSD reads and writes per client read / write of `ioSizeKiB` (requests aligned to their size;
+ * strips of one shard are contiguous, so a shard counts once per request):
  * - replication: a read hits the primary only, a write goes to every copy;
- * - classic EC: a read fetches the whole stripe (k shards, all k+m with fast_read); a small
- *   overwrite reads the k data shards and rewrites all k+m (read-modify-write);
- * - EC optimizations (allow_ec_optimizations, Tentacle): a partial read touches one shard; a small
- *   write uses parity-delta (1+m reads) or partial writes (k-1 reads), whichever reads less, and
- *   writes the changed data shard plus the m parity shards.
+ * - classic EC: a read fetches whole stripes (k shards, all k+m with fast_read); a write of part
+ *   of a stripe reads the k data shards and rewrites all k+m (read-modify-write);
+ * - EC optimizations (allow_ec_optimizations, Tentacle): a read touches only the d data shards
+ *   holding the data; a partial-stripe write uses parity-delta (d+m reads) or partial writes
+ *   (k-d reads), whichever reads less, and writes the d changed data shards plus m parity shards;
+ * - whole stripes are written without reading (k+m writes); a remainder beyond them is partial.
  */
-export function opCosts(scheme: Scheme, pool: Pick<PoolOptions, 'fastRead' | 'ecOptimizations'>): OpCosts {
+export function opCosts(scheme: Scheme, pool: IopsPoolOptions, ioSizeKiB: number = DEFAULT_IO_SIZE_KIB): OpCosts {
   if (scheme.kind === 'replicated') {
     return { read: { reads: 1, writes: 0 }, write: { reads: 0, writes: scheme.size } }
   }
   const { k, m } = scheme
-  if (pool.ecOptimizations) {
-    return { read: { reads: 1, writes: 0 }, write: { reads: Math.max(0, Math.min(1 + m, k - 1)), writes: 1 + m } }
+  const unit = Math.max(1, pool.stripeUnitKiB)
+  const size = Math.max(1, ioSizeKiB)
+  const width = k * unit
+  /** Data shards a request of `kib` touches. */
+  const shards = (kib: number) => Math.min(k, Math.ceil(kib / unit))
+  const partialReads = (kib: number) => {
+    const d = shards(kib)
+    return pool.ecOptimizations ? Math.max(0, Math.min(d + m, k - d)) : k
   }
-  return { read: { reads: pool.fastRead ? k + m : k, writes: 0 }, write: { reads: k, writes: k + m } }
+  const read = { reads: pool.ecOptimizations ? shards(size) : pool.fastRead ? k + m : k, writes: 0 }
+  if (size >= width) {
+    const rest = size % width
+    return { read, write: { reads: rest === 0 ? 0 : partialReads(rest), writes: k + m } }
+  }
+  return { read, write: { reads: partialReads(size), writes: pool.ecOptimizations ? shards(size) + m : k + m } }
 }
 
 /**
@@ -68,11 +93,17 @@ export function clusterIops(equivalents: number, cost: OpCost, osd: OsdIops): nu
 export interface IopsBasis {
   osd: OsdIops
   equivalents: number
+  ioSizeKiB: number
 }
 
-export function iopsBasis(osd: OsdIops, placedTB: number, largestOsdTB: number): IopsBasis | null {
+export function iopsBasis(
+  osd: OsdIops,
+  placedTB: number,
+  largestOsdTB: number,
+  ioSizeKiB: number = DEFAULT_IO_SIZE_KIB,
+): IopsBasis | null {
   if (!(osd.read > 0) && !(osd.write > 0)) return null
-  return { osd, equivalents: osdEquivalents(placedTB, largestOsdTB) }
+  return { osd, equivalents: osdEquivalents(placedTB, largestOsdTB), ioSizeKiB }
 }
 
 export interface IopsEstimate {
@@ -82,12 +113,8 @@ export interface IopsEstimate {
   basis: IopsBasis
 }
 
-export function estimateIops(
-  basis: IopsBasis,
-  scheme: Scheme,
-  pool: Pick<PoolOptions, 'fastRead' | 'ecOptimizations'>,
-): IopsEstimate {
-  const costs = opCosts(scheme, pool)
+export function estimateIops(basis: IopsBasis, scheme: Scheme, pool: IopsPoolOptions): IopsEstimate {
+  const costs = opCosts(scheme, pool, basis.ioSizeKiB)
   return {
     read: clusterIops(basis.equivalents, costs.read, basis.osd),
     write: clusterIops(basis.equivalents, costs.write, basis.osd),

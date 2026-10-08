@@ -5,7 +5,7 @@ import CapacityBar from './CapacityBar.vue'
 import FaqLink from './FaqLink.vue'
 import { FAQ_IDS } from '@/lib/faq'
 import { formatIops, formatPct, formatInt } from '@/lib/format'
-import { describeCost, explainIops, type IopsEstimate, type OpCost } from '@/lib/iops'
+import { describeCost, explainIops, ioSizeLabel, type IopsEstimate, type OpCost } from '@/lib/iops'
 import { formatCapacity } from '@/lib/units'
 import { placementMessage, type CapacityResult } from '@/lib/ceph'
 import { plural, type DomainType } from '@/lib/topology'
@@ -25,7 +25,7 @@ const props = defineProps<{
   iops: IopsEstimate | null
 }>()
 
-const IOPS_TITLE = '4k random IOPS until the largest OSDs are saturated: a ceiling for a healthy cluster with many parallel requests'
+const iopsSize = computed(() => (props.iops ? ioSizeLabel(props.iops.basis.ioSizeKiB) : ''))
 const iopsValue = (n: number | null) => (props.result.valid && n !== null ? formatIops(n) : '—')
 const iopsNote = (n: number | null, cost: OpCost, op: string) =>
   n !== null
@@ -34,7 +34,8 @@ const iopsNote = (n: number | null, cost: OpCost, op: string) =>
 // Tooltip: the arithmetic first, then what the number means.
 const iopsTitle = (op: 'read' | 'write') => {
   const sum = props.iops && props.result.valid ? explainIops(props.iops, op) : null
-  return sum ? `${sum}\n${IOPS_TITLE}` : IOPS_TITLE
+  const meaning = `${iopsSize.value} random IOPS until the largest OSDs are saturated: a ceiling for a healthy cluster with many parallel requests`
+  return sum ? `${sum}\n${meaning}` : meaning
 }
 
 const usableParts = computed(() => {
@@ -117,14 +118,14 @@ const usableParts = computed(() => {
         </dl>
         <dl v-if="iops" class="kpi">
           <div class="half" :title="iopsTitle('read')">
-            <dt><AppIcon name="disk-read" :size="14" /> Read IOPS</dt>
+            <dt><AppIcon name="disk-read" :size="14" /> Read IOPS · {{ iopsSize }}</dt>
             <dd>
               <strong>{{ iopsValue(iops.read) }}</strong>
               <span>{{ iopsNote(iops.read, iops.costs.read, 'read') }}</span>
             </dd>
           </div>
           <div class="half" :title="iopsTitle('write')">
-            <dt><AppIcon name="disk-write" :size="14" /> Write IOPS</dt>
+            <dt><AppIcon name="disk-write" :size="14" /> Write IOPS · {{ iopsSize }}</dt>
             <dd>
               <strong>{{ iopsValue(iops.write) }}</strong>
               <span>{{ iopsNote(iops.write, iops.costs.write, 'write') }}</span>

@@ -15,7 +15,7 @@ import {
 } from './pool'
 import { DEFAULT_RATIOS, type Scheme } from './ceph'
 import { CURRENCY_MAX_LENGTH, DEFAULT_CURRENCY, DEFAULT_PRICE_PER_TB } from './pricing'
-import { MAX_OSD_IOPS } from './iops'
+import { DEFAULT_IO_SIZE_KIB, IO_SIZES_KIB, MAX_OSD_IOPS } from './iops'
 import {
   ALL_DOMAIN_TYPES,
   BUCKET_TYPES,
@@ -46,9 +46,11 @@ export interface AppState {
   pricePerTB: number
   /** Free-text currency (EUR, $, USD, …). */
   currency: string
-  /** 4k random IOPS one OSD sustains (0 = not set, no IOPS estimate). */
+  /** Random IOPS one OSD sustains at the client I/O size (0 = not set, no IOPS estimate). */
   osdReadIops: number
   osdWriteIops: number
+  /** Client I/O size of the IOPS estimate, in KiB. */
+  ioSizeKiB: number
 }
 
 export function defaultState(): AppState {
@@ -67,6 +69,7 @@ export function defaultState(): AppState {
     currency: DEFAULT_CURRENCY,
     osdReadIops: 0,
     osdWriteIops: 0,
+    ioSizeKiB: DEFAULT_IO_SIZE_KIB,
   }
 }
 
@@ -88,11 +91,13 @@ interface Packed {
   /** Price per TB. */
   pt?: number
   cu?: string
-  /** Read and write IOPS per OSD; left out when not set. */
-  io?: [number, number]
+  /** Read and write IOPS per OSD and the I/O size in KiB; left out when not set. */
+  io?: [number, number, number]
 }
 
 const iops = (value: unknown) => Math.min(MAX_OSD_IOPS, int(value))
+const ioSize = (value: unknown) =>
+  (IO_SIZES_KIB as readonly number[]).includes(value as number) ? (value as number) : DEFAULT_IO_SIZE_KIB
 
 /** A fill ratio from untrusted input, clamped to 0–1; the fallback when missing or not a number. */
 function ratioOr(value: unknown, fallback: number): number {
@@ -209,8 +214,8 @@ export function encodeState(state: AppState): string {
     p: state.pool,
     pt: num(state.pricePerTB),
     cu: state.currency,
-    ...(state.osdReadIops > 0 || state.osdWriteIops > 0
-      ? { io: [iops(state.osdReadIops), iops(state.osdWriteIops)] as [number, number] }
+    ...(state.osdReadIops > 0 || state.osdWriteIops > 0 || state.ioSizeKiB !== DEFAULT_IO_SIZE_KIB
+      ? { io: [iops(state.osdReadIops), iops(state.osdWriteIops), ioSize(state.ioSizeKiB)] as [number, number, number] }
       : {}),
   }
   if (state.advanced) packed.a = state.advanced.map(packBucket)
@@ -246,6 +251,7 @@ export function decodeState(data: string): AppState | null {
     if (Array.isArray(p.io)) {
       state.osdReadIops = iops(p.io[0])
       state.osdWriteIops = iops(p.io[1])
+      state.ioSizeKiB = ioSize(p.io[2])
     }
     return state
   } catch {

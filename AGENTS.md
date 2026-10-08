@@ -85,13 +85,16 @@ real net = placeable(domains − N largest) × nearfull × f
 
 ```
 N_eff = placed capacity / largest OSD      (CRUSH weights I/O by capacity; equal OSDs = OSD count)
-IOPS  = N_eff / (reads / R + writes / W)   (R, W = per-OSD 4k read / write IOPS from step 5)
+IOPS  = N_eff / (reads / R + writes / W)   (R, W = per-OSD read / write IOPS at the client I/O size, step 5)
 ```
 
-- **OSD operations per client op:**
+- **OSD operations per client op** (`opCosts`; d = min(k, ⌈I/O size / stripe_unit⌉), requests aligned to their size):
   - replication: 1 read / n writes;
   - classic EC: k reads (k+m with `fast_read`) / k reads + k+m writes;
-  - `allow_ec_optimizations` (Tentacle): 1 read / min(1+m, k−1) reads + 1+m writes.
+  - `allow_ec_optimizations` (Tentacle): d reads / min(d+m, k−d) reads + d+m writes;
+  - whole stripes (a multiple of k × stripe_unit): k+m writes and no reads; a remainder is a partial stripe.
+- **Checked against Ceph's FastEC table** (6+2, stripe_unit 16K: 4–16K writes 3r+3w, 32K writes 4r+4w); keep those
+  test cases.
 - **Opt-in:** with both inputs at 0 the result card's IOPS row and the table's IOPS column are hidden. A value an
   operation needs but that is 0 shows "—".
 - **Scope:** a healthy-cluster ceiling only. Keep it that way unless the model is extended deliberately (network,
@@ -139,7 +142,7 @@ IOPS  = N_eff / (reads / R + writes / W)   (R, W = per-OSD 4k read / write IOPS 
 
 ### State, links and storage
 - **Shared links:** the whole configuration lives in the URL hash as base64url JSON (`#s=…`). Short keys are listed in
-  `urlState.ts`: `v t b a d s f bf nf r p pt cu`.
+  `urlState.ts`: `v t b a d s f bf nf r p pt cu io`.
   - Clamp and validate on **both** encode and decode.
   - Share limits through constants, e.g. `CURRENCY_MAX_LENGTH`.
 - **FAQ links** use `openFaq()`, not `#fragment` links, because the hash holds the configuration.

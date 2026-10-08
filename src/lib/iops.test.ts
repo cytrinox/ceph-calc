@@ -26,6 +26,41 @@ describe('opCosts', () => {
   })
 })
 
+describe('opCosts with a client I/O size', () => {
+  const su = (stripeUnitKiB: number, ecOptimizations = false) => ({ ...classic, stripeUnitKiB, ecOptimizations })
+
+  it('writes whole stripes without reading (classic EC)', () => {
+    // EC 4+2, stripe_unit 4K: stripe width 16K
+    expect(opCosts(ec(4, 2), su(4), 8).write).toEqual({ reads: 4, writes: 6 })
+    expect(opCosts(ec(4, 2), su(4), 16).write).toEqual({ reads: 0, writes: 6 })
+    expect(opCosts(ec(4, 2), su(4), 64).write).toEqual({ reads: 0, writes: 6 })
+    // EC 6+2, stripe_unit 4K: 32K = one 24K stripe + an 8K remainder that needs read-modify-write
+    expect(opCosts(ec(6, 2), su(4), 32).write).toEqual({ reads: 6, writes: 8 })
+    expect(opCosts(ec(4, 2), su(4), 64).read).toEqual({ reads: 4, writes: 0 })
+  })
+
+  it('matches the FastEC table for EC 6+2 with stripe_unit 16K', () => {
+    for (const size of [4, 8, 16]) expect(opCosts(ec(6, 2), su(16, true), size).write).toEqual({ reads: 3, writes: 3 })
+    expect(opCosts(ec(6, 2), su(16, true), 32).write).toEqual({ reads: 4, writes: 4 })
+  })
+
+  it('reads only the data shards a request touches with EC optimizations', () => {
+    expect(opCosts(ec(4, 2), su(4, true), 8).read).toEqual({ reads: 2, writes: 0 })
+    expect(opCosts(ec(4, 2), su(4, true), 16).read).toEqual({ reads: 4, writes: 0 })
+    expect(opCosts(ec(4, 2), su(16, true), 16).read).toEqual({ reads: 1, writes: 0 })
+  })
+
+  it('leaves replication alone (the per-OSD IOPS are given at the I/O size)', () => {
+    expect(opCosts(rep3, classic, 1024)).toEqual(opCosts(rep3, classic, 4))
+  })
+
+  it('makes stripe_unit matter for 16K writes on 8 OSDs at 100 IOPS', () => {
+    const basis = iopsBasis({ read: 100, write: 100 }, 8, 1, 16)!
+    expect(estimateIops(basis, ec(4, 2), su(4)).write).toBeCloseTo(800 / 6, 9) // whole stripe
+    expect(estimateIops(basis, ec(4, 2), su(16)).write).toBe(80) // read-modify-write
+  })
+})
+
 describe('cluster IOPS', () => {
   const basis = iopsBasis({ read: 200, write: 200 }, 12 * 8, 8)!
 

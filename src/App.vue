@@ -83,6 +83,7 @@ const iops = computed(() =>
     { read: num(state.osdReadIops), write: num(state.osdWriteIops) },
     stats.value.rawTB - domains.value.unplacedTB,
     stats.value.largestOsdTB,
+    state.ioSizeKiB,
   ),
 )
 const iopsEstimate = computed(() => (iops.value ? estimateIops(iops.value, state.scheme, state.pool) : null))
