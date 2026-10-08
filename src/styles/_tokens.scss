@@ -1,0 +1,41 @@
+// Design tokens shared by all components (injected via vite additionalData).
+
+$bp-md: 900px;
+$bp-sm: 560px;
+
+$radius-lg: 18px;
+$radius: 12px;
+$radius-sm: 8px;
+$gutter: 16px;
+
+$font-display: 'Space Grotesk', 'IBM Plex Sans', system-ui, sans-serif;
+$font-sans: 'IBM Plex Sans', system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+$font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+
+@mixin below($bp) {
+  @media (max-width: ($bp - 1px)) {
+    @content;
+  }
+}
+
+@mixin touch {
+  @media (pointer: coarse) {
+    @content;
+  }
+}
+
+// Small muted caption above values (sentence case, no tracking).
+@mixin caption {
+  font-family: $font-sans;
+  font-size: 0.8rem;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+@mixin card-title {
+  font-family: $font-display;
+  font-size: 1.1rem;
+  font-weight: 700;
+  letter-spacing: -0.01em;
+  margin: 0;
+}

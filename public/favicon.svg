@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64">
+  <!-- colours follow the app palette: accent #4cb1d7, protection #1a5478 -->
+  <!-- calculator body -->
+  <rect x="5" y="1" width="42" height="54" rx="7" fill="#4cb1d7"/>
+  <!-- display -->
+  <rect x="11" y="7" width="30" height="12" rx="2.5" fill="#1a5478"/>
+  <rect x="26" y="11" width="11" height="4" rx="1" fill="#bfe6f5"/>
+  <!-- keys -->
+  <g fill="#1a5478">
+    <rect x="11" y="24" width="8" height="7" rx="1.5"/>
+    <rect x="22" y="24" width="8" height="7" rx="1.5"/>
+    <rect x="33" y="24" width="8" height="7" rx="1.5"/>
+    <rect x="11" y="35" width="8" height="7" rx="1.5"/>
+    <rect x="22" y="35" width="8" height="7" rx="1.5"/>
+    <rect x="33" y="35" width="8" height="7" rx="1.5"/>
+    <rect x="11" y="46" width="8" height="5" rx="1.5"/>
+  </g>
+  <!-- "ceph" badge, bottom right -->
+  <rect x="22" y="43" width="41" height="20" rx="6" fill="#1a5478" stroke="#4cb1d7" stroke-width="2"/>
+  <text x="42.5" y="58" text-anchor="middle" font-family="Arial, Helvetica, sans-serif" font-size="15" font-weight="700" fill="#ffffff">ceph</text>
+</svg>

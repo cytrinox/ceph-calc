@@ -1,0 +1,132 @@
+@use 'themes';
+
+:root,
+:root[data-theme='dark'] {
+  @include themes.emit(themes.$dark);
+  color-scheme: dark;
+}
+
+:root[data-theme='light'] {
+  @include themes.emit(themes.$light);
+  color-scheme: light;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html {
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  margin: 0;
+  min-height: 100vh;
+  background:
+    radial-gradient(1200px 600px at 85% -10%, var(--bg-glow), transparent 60%),
+    var(--bg);
+  background-attachment: fixed;
+  color: var(--text);
+  font-family: $font-sans;
+  font-size: 1.2rem;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+}
+
+button,
+input,
+select {
+  font: inherit;
+  color: inherit;
+}
+
+input,
+select {
+  background: var(--input-bg);
+  border: 1px solid transparent;
+  border-radius: $radius-sm;
+  padding: 0.5rem 0.7rem;
+  min-height: 40px;
+  transition: border-color 0.15s, box-shadow 0.15s, background 0.15s;
+
+  &:hover {
+    border-color: var(--border-strong);
+  }
+
+  &:focus {
+    outline: none;
+    border-color: var(--accent);
+    box-shadow: 0 0 0 3px var(--focus);
+  }
+
+  @include touch {
+    min-height: 44px;
+  }
+}
+
+input[type='number'] {
+  font-family: $font-mono;
+}
+
+select {
+  cursor: pointer;
+}
+
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mono {
+  font-family: $font-mono;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+// Shared card chrome used by the main blocks.
+.card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: $radius-lg;
+  box-shadow: var(--shadow);
+  min-width: 0;
+}
+
+.card-head {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  padding: 1.2rem 1.4rem 0.4rem;
+
+  h2 {
+    @include card-title;
+  }
+
+  .icon-badge {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 10px;
+    background: var(--accent-soft);
+    color: var(--accent-text);
+    flex: 0 0 auto;
+  }
+
+  .aside {
+    margin-left: auto;
+  }
+
+  @include below($bp-sm) {
+    padding: 1rem 1rem 0.3rem;
+  }
+}
