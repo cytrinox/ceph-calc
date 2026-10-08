@@ -204,10 +204,6 @@ export function bucketCapacity(bucket: Bucket): number {
   return bucket.children.reduce((sum, c) => sum + int(c.count) * bucketCapacity(c), 0)
 }
 
-export function topologyCapacity(topology: Topology): number {
-  return topology.reduce((sum, b) => sum + int(b.count) * bucketCapacity(b), 0)
-}
-
 export type TypeCounts = Record<DomainType, number>
 
 export interface TreeStats {
