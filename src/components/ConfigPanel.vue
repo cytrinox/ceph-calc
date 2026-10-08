@@ -215,7 +215,7 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
             </template>
             <template v-else>
               {{ domainCount }} {{ plural(domain, domainCount) }}, but {{ width }} {{ pieces }} per object need
-              {{ width }}: this layout cannot be placed.
+              {{ width }} {{ plural(domain, width) }}: this layout cannot be placed.
             </template>
           </p>
         </div>
