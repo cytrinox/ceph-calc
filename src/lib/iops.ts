@@ -1,6 +1,7 @@
 // Rough 4k random IOPS ceiling of a pool, from the read and write IOPS a single OSD sustains.
 
 import type { Scheme } from './ceph'
+import { formatInt } from './format'
 import type { PoolOptions } from './pool'
 
 /** Upper bound for the per-OSD inputs (also used for shared links). */
@@ -78,6 +79,7 @@ export interface IopsEstimate {
   read: number | null
   write: number | null
   costs: OpCosts
+  basis: IopsBasis
 }
 
 export function estimateIops(
@@ -90,6 +92,7 @@ export function estimateIops(
     read: clusterIops(basis.equivalents, costs.read, basis.osd),
     write: clusterIops(basis.equivalents, costs.write, basis.osd),
     costs,
+    basis,
   }
 }
 
@@ -99,4 +102,29 @@ const count = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
 export function describeCost(cost: OpCost): string {
   if (cost.reads > 0 && cost.writes > 0) return `${count(cost.reads, 'read')} + ${count(cost.writes, 'write')}`
   return cost.reads > 0 ? `${count(cost.reads, 'OSD read')}` : `${count(cost.writes, 'OSD write')}`
+}
+
+/** "8 OSDs", or "42.5 capacity-weighted OSDs" when the OSD sizes differ. */
+function osdCount(equivalents: number): string {
+  const whole = Math.round(equivalents)
+  return Math.abs(equivalents - whole) < 1e-9
+    ? `${formatInt(whole)} ${whole === 1 ? 'OSD' : 'OSDs'}`
+    : `${equivalents.toFixed(1)} capacity-weighted OSDs`
+}
+
+/**
+ * The arithmetic behind one estimate, e.g. "8 OSDs × 100 IOPS ÷ 1 OSD read = 800" or
+ * "8 OSDs ÷ (4 reads ÷ 100 + 6 writes ÷ 100 IOPS) = 80"; null when there is no value.
+ */
+export function explainIops(estimate: IopsEstimate, op: 'read' | 'write'): string | null {
+  const value = estimate[op]
+  if (value === null) return null
+  const cost = estimate.costs[op]
+  const { osd, equivalents } = estimate.basis
+  const result = formatInt(Math.round(value))
+  if (cost.reads > 0 && cost.writes > 0) {
+    return `${osdCount(equivalents)} ÷ (${count(cost.reads, 'read')} ÷ ${formatInt(osd.read)} + ${count(cost.writes, 'write')} ÷ ${formatInt(osd.write)} IOPS) = ${result}`
+  }
+  const perOsd = cost.reads > 0 ? osd.read : osd.write
+  return `${osdCount(equivalents)} × ${formatInt(perOsd)} IOPS ÷ ${describeCost(cost)} = ${result}`
 }

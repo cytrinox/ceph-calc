@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clusterIops, describeCost, estimateIops, iopsBasis, opCosts, osdEquivalents } from './iops'
+import { clusterIops, describeCost, estimateIops, explainIops, iopsBasis, opCosts, osdEquivalents } from './iops'
 import { defaultPoolOptions } from './pool'
 import { buildBasicTopology, topologyStats, TOPOLOGY_EXAMPLES } from './topology'
 import type { Scheme } from './ceph'
@@ -65,6 +65,20 @@ describe('cluster IOPS', () => {
   it('uses the Basic OSD size as the largest OSD', () => {
     expect(topologyStats(buildBasicTopology({ hosts: 5, osdsPerHost: 8, osdSizeTB: 8 })).largestOsdTB).toBe(8)
     expect(topologyStats([]).largestOsdTB).toBe(0)
+  })
+})
+
+describe('explainIops', () => {
+  it('writes out the arithmetic of an estimate', () => {
+    const basis = iopsBasis({ read: 100, write: 100 }, 8 * 4, 4)!
+    const optimized = estimateIops(basis, ec(4, 2), { ...classic, ecOptimizations: true })
+    expect(explainIops(optimized, 'read')).toBe('8 OSDs × 100 IOPS ÷ 1 OSD read = 800')
+    expect(explainIops(optimized, 'write')).toBe('8 OSDs ÷ (3 reads ÷ 100 + 3 writes ÷ 100 IOPS) = 133')
+    const rep = estimateIops(basis, rep3, classic)
+    expect(explainIops(rep, 'write')).toBe('8 OSDs × 100 IOPS ÷ 3 OSD writes = 267')
+    const mixed = estimateIops(iopsBasis({ read: 100, write: 0 }, 85, 2)!, rep3, classic)
+    expect(explainIops(mixed, 'read')).toBe('42.5 capacity-weighted OSDs × 100 IOPS ÷ 1 OSD read = 4,250')
+    expect(explainIops(mixed, 'write')).toBeNull()
   })
 })
 
