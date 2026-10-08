@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeCapacity, defaultMinSize, dataUntilRatio, placeableCapacity, placementHint, rawUntilRatio, ratiosOrdered, schemeMinSize, type Scheme } from './ceph'
+import { computeCapacity, defaultMinSize, dataUntilRatio, placeableCapacity, placementHint, placementMessage, rawUntilRatio, ratiosOrdered, schemeMinSize, type Scheme } from './ceph'
 import { buildBasicTopology, failureDomains } from './topology'
 import { DEFAULT_SCHEME, PRESETS } from './schemes'
 
@@ -175,6 +175,16 @@ describe('placementHint', () => {
   it('shows only the layout requirement without a reserve', () => {
     const r = computeCapacity(eight, { kind: 'ec', k: 6, m: 3 }, { ...t, healDomains: 0 })
     expect(placementHint(r, 'host')).toEqual({ needs: 'needs 9 hosts', reserve: null })
+  })
+
+  it('builds the same sentence for the result card and the commands panel', () => {
+    const r = computeCapacity(eight, { kind: 'ec', k: 6, m: 2 }, t)
+    expect(placementMessage(r, 'host')).toBe('Not enough hosts: needs 8 hosts (+ 2 recovery reserve), you have 8.')
+    const plain = computeCapacity(eight, { kind: 'ec', k: 6, m: 3 }, { ...t, healDomains: 0 })
+    expect(placementMessage(plain, 'host')).toBe('Not enough hosts: needs 9 hosts, you have 8.')
+    const badScheme = computeCapacity(eight, { kind: 'replicated', size: 2, minSize: 3 }, { ...t, healDomains: 0 })
+    expect(placementMessage(badScheme, 'host')).toBe('The pool layout is not valid.')
+    expect(placementMessage(computeCapacity(eight, rep3, t), 'host')).toBeNull()
   })
 
   it('returns null for placeable layouts', () => {

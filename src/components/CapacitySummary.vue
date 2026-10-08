@@ -6,7 +6,7 @@ import FaqLink from './FaqLink.vue'
 import { FAQ_IDS } from '@/lib/faq'
 import { formatPct, formatInt } from '@/lib/format'
 import { formatCapacity } from '@/lib/units'
-import type { CapacityResult } from '@/lib/ceph'
+import { placementMessage, type CapacityResult } from '@/lib/ceph'
 import { plural, type DomainType } from '@/lib/topology'
 
 const props = defineProps<{
@@ -57,14 +57,7 @@ const usableParts = computed(() => {
         </template>
         <template v-else>
           <div class="big invalid"><span class="value">n/a</span></div>
-          <p class="lead error">
-            <template v-if="result.domainCount < result.minDomains">
-              Not enough {{ plural(domain) }}: this layout needs {{ formatInt(result.minDomains) }}
-              ({{ result.width }} to place every shard<template v-if="healDomains > 0">, +{{ healDomains }} for the recovery reserve</template>),
-              you have {{ formatInt(result.domainCount) }}.
-            </template>
-            <template v-else>The pool layout or topology is not valid.</template>
-          </p>
+          <p class="lead error">{{ placementMessage(result, domain) }}</p>
         </template>
         <ul class="facts">
           <li v-if="compression" class="compress" :title="compression.detail">

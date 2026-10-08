@@ -249,3 +249,15 @@ export function placementHint(result: CapacityResult, domain: DomainType): Place
     reserve: reserve > 0 ? `+ ${formatInt(reserve)} recovery reserve` : null,
   }
 }
+
+/**
+ * Full sentence for a layout that cannot be used (null when it can), worded like the
+ * comparison hint: "Not enough hosts: needs 8 hosts (+ 2 recovery reserve), you have 7."
+ */
+export function placementMessage(result: CapacityResult, domain: DomainType): string | null {
+  const hint = placementHint(result, domain)
+  if (!hint) return null
+  if (result.domainCount >= result.minDomains) return 'The pool layout is not valid.'
+  const reserve = hint.reserve ? ` (${hint.reserve})` : ''
+  return `Not enough ${plural(domain)}: ${hint.needs}${reserve}, you have ${formatInt(result.domainCount)}.`
+}

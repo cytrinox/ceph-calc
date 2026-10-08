@@ -8,7 +8,7 @@ import SchemeTable from './components/SchemeTable.vue'
 import ShareButton from './components/ShareButton.vue'
 import ThemeToggle from './components/ThemeToggle.vue'
 import UnitToggle from './components/UnitToggle.vue'
-import { computeCapacity, ratiosOrdered, type Scheme } from './lib/ceph'
+import { computeCapacity, placementMessage, ratiosOrdered, type Scheme } from './lib/ceph'
 import { formatInt, formatPct, formatTB } from './lib/format'
 import { formatCapacity } from './lib/units'
 import { clusterPrice, formatPrice, pricePerUsableTB } from './lib/pricing'
@@ -148,14 +148,7 @@ const warnings = computed(() => {
   return list
 })
 
-const placementProblem = computed(() => {
-  const r = result.value
-  if (r.valid) return undefined
-  const fd = state.failureDomain
-  return r.domainCount < r.minDomains
-    ? `This layout needs ${formatInt(r.minDomains)} ${plural(fd, r.minDomains)} but the topology has ${formatInt(r.domainCount)}; the pool would not place (or recover) all shards.`
-    : 'The pool layout is not valid.'
-})
+const placementProblem = computed(() => placementMessage(result.value, state.failureDomain) ?? undefined)
 
 // Effective capacity when the pool compresses data (only with compression enabled).
 const compression = computed(() => {
