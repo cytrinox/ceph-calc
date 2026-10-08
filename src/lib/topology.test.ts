@@ -124,7 +124,7 @@ describe('topology', () => {
 
   it('starts a first visit with replication 3x and no recovery reserve', () => {
     expect(defaultState().scheme).toEqual({ kind: 'replicated', size: 3, minSize: 2 })
-    expect(defaultState().healDomains).toBe(0)
+    expect(defaultState().recoveryReserve).toBe(0)
   })
 
   it('stores the price per TB in shared links', () => {

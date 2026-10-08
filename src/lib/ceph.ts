@@ -15,7 +15,7 @@ export interface Tunables {
   /** OSD nearfull ratio: HEALTH_WARN above this fill level. */
   nearfullRatio: number
   /** Failure domains that can be lost while keeping room to recover (recovery reserve). */
-  healDomains: number
+  recoveryReserve: number
 }
 
 /** Ceph defaults (mon_osd_*_ratio). */
@@ -34,7 +34,7 @@ export interface CapacityInput {
 }
 
 export interface ReservedBreakdown {
-  healTB: number
+  recoveryReserveTB: number
   strandedTB: number
   nearfullHeadroomTB: number
   unplacedTB: number
@@ -135,7 +135,7 @@ export function computeCapacity(input: CapacityInput, scheme: Scheme, tunables: 
   const width = schemeWidth(scheme)
   const dataFraction = schemeDataFraction(scheme)
   const minSize = schemeMinSize(scheme)
-  const heal = Math.max(0, Math.floor(tunables.healDomains || 0))
+  const reserve = Math.max(0, Math.floor(tunables.recoveryReserve || 0))
   const fullRatio = clampRatio(tunables.fullRatio)
   const backfillfullRatio = Math.min(fullRatio, clampRatio(tunables.backfillfullRatio))
   const nearfullRatio = Math.min(fullRatio, clampRatio(tunables.nearfullRatio))
@@ -143,7 +143,7 @@ export function computeCapacity(input: CapacityInput, scheme: Scheme, tunables: 
   const domainCount = groups.reduce((n, g) => n + g.mult, 0)
   const placedTB = groups.reduce((sum, g) => sum + g.capTB * g.mult, 0)
   const rawTB = placedTB + input.unplacedTB
-  const minDomains = width + heal
+  const minDomains = width + reserve
 
   const failuresTolerated = scheme.kind === 'replicated' ? scheme.size - 1 : scheme.m
   const ioFailuresTolerated = Math.max(0, width - minSize)
@@ -167,28 +167,28 @@ export function computeCapacity(input: CapacityInput, scheme: Scheme, tunables: 
       usableTB: 0,
       protectionTB: 0,
       reservedTB: rawTB,
-      reserved: { healTB: 0, strandedTB: 0, nearfullHeadroomTB: 0, unplacedTB: input.unplacedTB },
+      reserved: { recoveryReserveTB: 0, strandedTB: 0, nearfullHeadroomTB: 0, unplacedTB: input.unplacedTB },
       healthyFill: 0,
       healthyPlaceableTB: 0,
       efficiency: 0,
     }
   }
 
-  const largest = largestDomains(groups, heal + width)
+  const largest = largestDomains(groups, reserve + width)
 
   // Capacity a healthy cluster can fill (all domains, after imbalance); used for the ratio markers.
   const healthyPlaceableTB = placeableCapacity(largest.slice(0, width), placedTB, width)
 
-  // Planning limit: after losing the `heal` largest domains and re-replicating
+  // Planning limit: after losing the `reserve` largest domains and re-replicating
   // their data onto the rest, the surviving OSDs must still be below nearfull.
-  // The nearfull headroom is never used to absorb recovery data. With heal = 0
+  // The nearfull headroom is never used to absorb recovery data. With reserve = 0
   // this is simply the healthy cluster staying below nearfull.
-  const healTB = largest.slice(0, heal).reduce((a, b) => a + b, 0)
-  const remainingTB = placedTB - healTB
-  const placeableTB = placeableCapacity(largest.slice(heal), remainingTB, width)
+  const recoveryReserveTB = largest.slice(0, reserve).reduce((a, b) => a + b, 0)
+  const remainingTB = placedTB - recoveryReserveTB
+  const placeableTB = placeableCapacity(largest.slice(reserve), remainingTB, width)
   const writableTB = placeableTB * nearfullRatio
   const reserved = {
-    healTB,
+    recoveryReserveTB,
     strandedTB: Math.max(0, remainingTB - placeableTB),
     nearfullHeadroomTB: placeableTB - writableTB,
     unplacedTB: input.unplacedTB,
@@ -201,7 +201,7 @@ export function computeCapacity(input: CapacityInput, scheme: Scheme, tunables: 
     valid: true,
     usableTB,
     protectionTB,
-    reservedTB: reserved.healTB + reserved.strandedTB + reserved.nearfullHeadroomTB + reserved.unplacedTB,
+    reservedTB: reserved.recoveryReserveTB + reserved.strandedTB + reserved.nearfullHeadroomTB + reserved.unplacedTB,
     reserved,
     healthyFill: healthyPlaceableTB > 0 ? writableTB / healthyPlaceableTB : 0,
     healthyPlaceableTB,

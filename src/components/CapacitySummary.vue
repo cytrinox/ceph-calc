@@ -14,7 +14,7 @@ const props = defineProps<{
   schemeName: string
   facts: string[]
   domain: DomainType
-  healDomains: number
+  recoveryReserve: number
   warnings: string[]
   /** Cluster price label; null when no price per TB is set. */
   price: { total: string; perUsableTB: string | null; detail: string } | null
@@ -89,7 +89,7 @@ const usableParts = computed(() => {
             <dt><AppIcon name="shield" :size="14" /> Survives losing</dt>
             <dd>
               <strong>{{ result.failuresTolerated }} {{ plural(domain, result.failuresTolerated) }}</strong>
-              <span>no data loss<template v-if="healDomains > 0">, then recovers</template></span>
+              <span>no data loss<template v-if="recoveryReserve > 0">, then recovers</template></span>
             </dd>
           </div>
           <div class="half tone-important">
@@ -104,7 +104,7 @@ const usableParts = computed(() => {
     </div>
 
     <div class="bar-wrap">
-      <CapacityBar :result="result" :domain="domain" :heal-domains="healDomains" />
+      <CapacityBar :result="result" :domain="domain" :recovery-reserve="recoveryReserve" />
     </div>
 
     <div v-if="warnings.length" class="callout" role="note">

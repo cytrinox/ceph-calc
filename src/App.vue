@@ -72,14 +72,14 @@ const tunables = computed(() => ({
   fullRatio: num(state.fullRatio),
   backfillfullRatio: num(state.backfillfullRatio),
   nearfullRatio: num(state.nearfullRatio),
-  healDomains: num(state.healDomains),
+  recoveryReserve: num(state.recoveryReserve),
 }))
 const result = computed(() => computeCapacity(input.value, state.scheme, tunables.value))
 
 const facts = computed(() => {
   const s = stats.value
   const fd = state.failureDomain
-  const heal = tunables.value.healDomains
+  const reserve = tunables.value.recoveryReserve
   const list =
     state.tab === 'basic'
       ? [`${formatInt(s.counts.host)} × ${state.basic.osdsPerHost} OSDs × ${formatTB(state.basic.osdSizeTB)}`]
@@ -88,8 +88,8 @@ const facts = computed(() => {
   const r = result.value
   const nf = r.fillRatios.nearfull.toFixed(2)
   list.push(
-    heal > 0
-      ? `below nearfull ${nf} even after recovering ${heal} failed ${plural(fd, heal)}`
+    reserve > 0
+      ? `below nearfull ${nf} even after recovering ${reserve} failed ${plural(fd, reserve)}`
       : `below nearfull ${nf}, no recovery reserve`,
   )
   if (r.valid) list.push(`healthy OSDs at most ${formatPct(r.healthyFill)} full`)
@@ -121,13 +121,13 @@ const warnings = computed(() => {
   }
   const balance = domainBalance(domains.value.groups)
   if (balance && balance.spread > UNBALANCED_SPREAD) {
-    const heal = tunables.value.healDomains
-    const healCost =
-      heal > 0
-        ? ` The recovery reserve must cover the largest ${plural(fd, 1)}: ${formatCapacity((balance.largestTB - balance.averageTB) * heal)} more than for average-sized ones.`
+    const reserve = tunables.value.recoveryReserve
+    const reserveCost =
+      reserve > 0
+        ? ` The recovery reserve must cover the largest ${plural(fd, 1)}: ${formatCapacity((balance.largestTB - balance.averageTB) * reserve)} more than for average-sized ones.`
         : ''
     list.push(
-      `Unbalanced ${plural(fd)}: ${formatCapacity(balance.smallestTB)} to ${formatCapacity(balance.largestTB)} (average ${formatCapacity(balance.averageTB)}).${healCost} CRUSH also spreads data less evenly across uneven ${plural(fd)}.`,
+      `Unbalanced ${plural(fd)}: ${formatCapacity(balance.smallestTB)} to ${formatCapacity(balance.largestTB)} (average ${formatCapacity(balance.averageTB)}).${reserveCost} CRUSH also spreads data less evenly across uneven ${plural(fd)}.`,
     )
   }
   if (domains.value.unplacedTB > 0) {
@@ -233,7 +233,7 @@ watch(
           :price="price"
           :compression="compression"
           :domain="state.failureDomain"
-          :heal-domains="tunables.healDomains"
+          :recovery-reserve="tunables.recoveryReserve"
           :warnings="warnings"
         />
         <SchemeTable

@@ -39,7 +39,7 @@ export interface AppState {
   fullRatio: number
   backfillfullRatio: number
   nearfullRatio: number
-  healDomains: number
+  recoveryReserve: number
   pool: PoolOptions
   /** Price per decimal TB of raw drive capacity. */
   pricePerTB: number
@@ -57,7 +57,7 @@ export function defaultState(): AppState {
     fullRatio: DEFAULT_RATIOS.full,
     backfillfullRatio: DEFAULT_RATIOS.backfillfull,
     nearfullRatio: DEFAULT_RATIOS.nearfull,
-    healDomains: 0,
+    recoveryReserve: 0,
     pool: defaultPoolOptions(),
     pricePerTB: DEFAULT_PRICE_PER_TB,
     currency: DEFAULT_CURRENCY,
@@ -77,7 +77,7 @@ interface Packed {
   f: number
   bf?: number
   nf?: number
-  h: number
+  r: number
   p?: Partial<PoolOptions>
   /** Price per TB. */
   pt?: number
@@ -194,7 +194,7 @@ export function encodeState(state: AppState): string {
     f: clampRatio(state.fullRatio),
     bf: clampRatio(state.backfillfullRatio),
     nf: clampRatio(state.nearfullRatio),
-    h: int(state.healDomains),
+    r: int(state.recoveryReserve),
     p: state.pool,
     pt: num(state.pricePerTB),
     cu: state.currency,
@@ -225,7 +225,7 @@ export function decodeState(data: string): AppState | null {
     state.fullRatio = ratioOr(p.f, state.fullRatio)
     state.backfillfullRatio = ratioOr(p.bf, state.backfillfullRatio)
     state.nearfullRatio = ratioOr(p.nf, state.nearfullRatio)
-    state.healDomains = int(p.h)
+    state.recoveryReserve = int(p.r)
     state.pool = sanitizePool(p.p)
     if (typeof p.pt === 'number' && Number.isFinite(p.pt)) state.pricePerTB = Math.max(0, p.pt)
     if (typeof p.cu === 'string') state.currency = p.cu.slice(0, CURRENCY_MAX_LENGTH)

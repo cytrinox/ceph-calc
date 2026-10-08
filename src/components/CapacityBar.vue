@@ -6,7 +6,7 @@ import { formatCapacity } from '@/lib/units'
 import { dataUntilRatio, rawUntilRatio, type CapacityResult } from '@/lib/ceph'
 import { plural, type DomainType } from '@/lib/topology'
 
-const props = defineProps<{ result: CapacityResult; domain: DomainType; healDomains: number }>()
+const props = defineProps<{ result: CapacityResult; domain: DomainType; recoveryReserve: number }>()
 
 const share = (tb: number) => (props.result.rawTB > 0 ? tb / props.result.rawTB : 0)
 
@@ -57,9 +57,9 @@ const untilLimits = computed(() => {
 
 const breakdown = computed(() => {
   const r = props.result.reserved
-  const n = props.healDomains
+  const n = props.recoveryReserve
   return [
-    { label: `Recovery reserve (${n} ${plural(props.domain, n)})`, tb: r.healTB },
+    { label: `Recovery reserve (${n} ${plural(props.domain, n)})`, tb: r.recoveryReserveTB },
     { label: `Nearfull headroom (${formatPct(1 - props.result.fillRatios.nearfull)})`, tb: r.nearfullHeadroomTB },
     { label: 'Stranded by imbalance', tb: r.strandedTB },
     { label: 'Outside failure domains', tb: r.unplacedTB },

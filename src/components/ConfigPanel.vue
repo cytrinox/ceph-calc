@@ -87,7 +87,7 @@ const redundancySummary = computed(() => `${schemeLabel(props.state.scheme)} · 
 const headroomSummary = computed(() => {
   const st = props.state
   const r = (x: number) => Number(x).toFixed(2)
-  return `recovery reserve ${st.healDomains} · nearfull ${r(st.nearfullRatio)} · backfillfull ${r(st.backfillfullRatio)} · full ${r(st.fullRatio)}`
+  return `recovery reserve ${st.recoveryReserve} · nearfull ${r(st.nearfullRatio)} · backfillfull ${r(st.backfillfullRatio)} · full ${r(st.fullRatio)}`
 })
 const poolSummary = computed(() => {
   const pool = props.state.pool
@@ -196,9 +196,9 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
 
     <StepSection :num="3" collapsed-by-default title="Headroom" subtitle="Space kept free so the cluster stays healthy" :summary="headroomSummary">
       <div class="stack">
-        <div class="heal">
+        <div class="reserve-field">
           <NumberField
-            v-model="state.healDomains"
+            v-model="state.recoveryReserve"
             label="Recovery reserve"
             :hint="`Free space to recover the data of this many failed ${plural(domain)}.`"
             :min="0"
@@ -208,7 +208,7 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
               <FaqLink :target="FAQ_IDS.recoveryReserve" topic="the recovery reserve" />
             </template>
           </NumberField>
-          <p class="spare" :class="{ bad: spareDomains < 0 || state.healDomains > spareDomains }">
+          <p class="spare" :class="{ bad: spareDomains < 0 || state.recoveryReserve > spareDomains }">
             <template v-if="spareDomains >= 0">
               {{ domainCount }} {{ plural(domain, domainCount) }} − {{ width }} {{ pieces }} per object =
               <strong>{{ spareDomains }} spare</strong> for placement, so the reserve can be at most
@@ -365,7 +365,7 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
   }
 }
 
-.heal {
+.reserve-field {
   display: grid;
   gap: 0.45rem;
 }

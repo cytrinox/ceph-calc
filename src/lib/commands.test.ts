@@ -7,7 +7,7 @@ const tunables = {
   fullRatio: DEFAULT_RATIOS.full,
   backfillfullRatio: DEFAULT_RATIOS.backfillfull,
   nearfullRatio: DEFAULT_RATIOS.nearfull,
-  healDomains: 1,
+  recoveryReserve: 1,
 }
 
 const input = (scheme: Scheme, pool = defaultPoolOptions(), extra: Partial<CommandInput> = {}): CommandInput => ({
