@@ -33,10 +33,18 @@ export interface CapacityInput {
   unplacedTB: number
 }
 
+/** Space kept free on purpose. */
 export interface ReservedBreakdown {
+  /** Fillable capacity given up so that the reserved failure domains can be lost and recovered. */
   recoveryReserveTB: number
-  strandedTB: number
   nearfullHeadroomTB: number
+}
+
+/** Space that can never be filled, not even by a healthy cluster. */
+export interface UnusableBreakdown {
+  /** Capacity of oversized failure domains beyond their 1/width share. */
+  strandedTB: number
+  /** Capacity outside any bucket of the failure-domain type. */
   unplacedTB: number
 }
 
@@ -55,6 +63,8 @@ export interface CapacityResult {
   protectionTB: number
   reservedTB: number
   reserved: ReservedBreakdown
+  unusableTB: number
+  unusable: UnusableBreakdown
   /** Fill level of healthy OSDs when the pool holds its usable capacity. */
   healthyFill: number
   /** Raw capacity a healthy cluster can fill (all domains, after imbalance). */
@@ -166,8 +176,11 @@ export function computeCapacity(input: CapacityInput, scheme: Scheme, tunables: 
       valid: false,
       usableTB: 0,
       protectionTB: 0,
-      reservedTB: rawTB,
-      reserved: { recoveryReserveTB: 0, strandedTB: 0, nearfullHeadroomTB: 0, unplacedTB: input.unplacedTB },
+      reservedTB: 0,
+      reserved: { recoveryReserveTB: 0, nearfullHeadroomTB: 0 },
+      // Nothing can be stored on an invalid layout.
+      unusableTB: rawTB,
+      unusable: { strandedTB: 0, unplacedTB: input.unplacedTB },
       healthyFill: 0,
       healthyPlaceableTB: 0,
       efficiency: 0,
@@ -183,14 +196,17 @@ export function computeCapacity(input: CapacityInput, scheme: Scheme, tunables: 
   // their data onto the rest, the surviving OSDs must still be below nearfull.
   // The nearfull headroom is never used to absorb recovery data. With reserve = 0
   // this is simply the healthy cluster staying below nearfull.
-  const recoveryReserveTB = largest.slice(0, reserve).reduce((a, b) => a + b, 0)
-  const remainingTB = placedTB - recoveryReserveTB
-  const placeableTB = placeableCapacity(largest.slice(reserve), remainingTB, width)
+  const lostTB = largest.slice(0, reserve).reduce((a, b) => a + b, 0)
+  const placeableTB = placeableCapacity(largest.slice(reserve), placedTB - lostTB, width)
   const writableTB = placeableTB * nearfullRatio
+  // Space even the healthy cluster cannot fill is unusable; the recovery reserve is the
+  // fillable space given up on top of that (removing domains never adds placeable space).
   const reserved = {
-    recoveryReserveTB,
-    strandedTB: Math.max(0, remainingTB - placeableTB),
+    recoveryReserveTB: Math.max(0, healthyPlaceableTB - placeableTB),
     nearfullHeadroomTB: placeableTB - writableTB,
+  }
+  const unusable = {
+    strandedTB: Math.max(0, placedTB - healthyPlaceableTB),
     unplacedTB: input.unplacedTB,
   }
   const usableTB = writableTB * dataFraction
@@ -201,8 +217,10 @@ export function computeCapacity(input: CapacityInput, scheme: Scheme, tunables: 
     valid: true,
     usableTB,
     protectionTB,
-    reservedTB: reserved.recoveryReserveTB + reserved.strandedTB + reserved.nearfullHeadroomTB + reserved.unplacedTB,
+    reservedTB: reserved.recoveryReserveTB + reserved.nearfullHeadroomTB,
     reserved,
+    unusableTB: unusable.strandedTB + unusable.unplacedTB,
+    unusable,
     healthyFill: healthyPlaceableTB > 0 ? writableTB / healthyPlaceableTB : 0,
     healthyPlaceableTB,
     efficiency: rawTB > 0 ? usableTB / rawTB : 0,

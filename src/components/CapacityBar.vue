@@ -14,7 +14,11 @@ const segments = computed(() => [
   { key: 'usable', label: 'Usable data', note: 'what you can store', tb: props.result.usableTB },
   { key: 'protection', label: 'Protection overhead', note: 'replicas / parity', tb: props.result.protectionTB },
   { key: 'reserved', label: 'Reserved headroom', note: 'kept free on purpose', tb: props.result.reservedTB },
+  { key: 'unusable', label: 'Unusable', note: 'can never be filled', tb: props.result.unusableTB },
 ])
+
+// The unusable block only appears when there is unusable space (balanced clusters have none).
+const legend = computed(() => segments.value.filter((s) => s.key !== 'unusable' || s.tb > 1e-9))
 
 /** Where healthy OSDs reach each fill ratio, as a share of raw capacity. */
 const markers = computed(() => {
@@ -55,15 +59,20 @@ const untilLimits = computed(() => {
   })
 })
 
-const breakdown = computed(() => {
-  const r = props.result.reserved
+const breakdowns = computed(() => {
+  const { reserved, unusable, fillRatios } = props.result
   const n = props.recoveryReserve
-  return [
-    { label: `Recovery reserve (${n} ${plural(props.domain, n)})`, tb: r.recoveryReserveTB },
-    { label: `Nearfull headroom (${formatPct(1 - props.result.fillRatios.nearfull)})`, tb: r.nearfullHeadroomTB },
-    { label: 'Stranded by imbalance', tb: r.strandedTB },
-    { label: 'Outside failure domains', tb: r.unplacedTB },
-  ].filter((b) => b.tb > 1e-9)
+  const visible = (items: { label: string; tb: number }[]) => items.filter((b) => b.tb > 1e-9)
+  return {
+    reserved: visible([
+      { label: `Recovery reserve (${n} ${plural(props.domain, n)})`, tb: reserved.recoveryReserveTB },
+      { label: `Nearfull headroom (${formatPct(1 - fillRatios.nearfull)})`, tb: reserved.nearfullHeadroomTB },
+    ]),
+    unusable: visible([
+      { label: 'Stranded by imbalance', tb: unusable.strandedTB },
+      { label: 'Outside failure domains', tb: unusable.unplacedTB },
+    ]),
+  } as Record<string, { label: string; tb: number }[]>
 })
 </script>
 
@@ -108,8 +117,8 @@ const breakdown = computed(() => {
     </div>
     </div>
 
-    <ul class="legend">
-      <li v-for="s in segments" :key="s.key" :class="s.key">
+    <ul class="legend" :class="`cols-${legend.length}`">
+      <li v-for="s in legend" :key="s.key" :class="s.key">
         <span class="swatch" />
         <span class="label">{{ s.label }}</span>
         <span class="value">{{ formatCapacity(s.tb) }}</span>
@@ -120,8 +129,8 @@ const breakdown = computed(() => {
             <span class="mono">+{{ formatCapacity(u.tb) }}</span> until {{ u.key }}
           </li>
         </ul>
-        <ul v-if="s.key === 'reserved' && breakdown.length" class="breakdown">
-          <li v-for="b in breakdown" :key="b.label">
+        <ul v-if="breakdowns[s.key]?.length" class="breakdown">
+          <li v-for="b in breakdowns[s.key]" :key="b.label">
             <span>{{ b.label }}</span>
             <span class="mono">{{ formatCapacity(b.tb) }}</span>
           </li>
@@ -243,10 +252,41 @@ $marker-h: 11px;
   );
 }
 
+.seg.unusable {
+  color: var(--text-muted);
+  background: repeating-linear-gradient(
+    135deg,
+    var(--unusable) 0 7px,
+    var(--unusable-stripe) 7px 9px
+  );
+}
+
+// Legend columns follow the card width (not the viewport): four blocks go 4 → 2 × 2 → 1.
+.capacity-bar {
+  container-type: inline-size;
+}
+
 .legend {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 0.75rem;
+
+  &.cols-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    row-gap: 1rem;
+
+    @container (min-width: 40rem) {
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+    }
+  }
+
+  @container (max-width: 30rem) {
+    &.cols-3,
+    &.cols-4 {
+      grid-template-columns: minmax(0, 1fr);
+    }
+  }
+
   list-style: none;
   margin: 1rem 0 0;
   padding: 0;
@@ -276,6 +316,11 @@ $marker-h: 11px;
 
   .reserved .swatch {
     background: var(--reserved-stripe);
+    box-shadow: inset 0 0 0 1px var(--border-strong);
+  }
+
+  .unusable .swatch {
+    background: var(--unusable-stripe);
     box-shadow: inset 0 0 0 1px var(--border-strong);
   }
 
@@ -332,10 +377,12 @@ $marker-h: 11px;
   li {
     display: flex;
     justify-content: space-between;
+    align-items: baseline;
     gap: 0.5rem;
   }
 
   .mono {
+    flex: 0 0 auto;
     font-family: $font-mono;
     color: var(--text);
   }
@@ -344,10 +391,6 @@ $marker-h: 11px;
 @include below($bp-sm) {
   .bar {
     height: 38px;
-  }
-
-  .legend {
-    grid-template-columns: 1fr;
   }
 }
 </style>

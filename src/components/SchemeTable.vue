@@ -32,6 +32,7 @@ const rows = computed(() => {
       result,
       usableShare: result.valid ? result.usableTB / raw : 0,
       protectionShare: result.valid ? result.protectionTB / raw : 0,
+      unusableShare: result.valid ? result.unusableTB / raw : 0,
       hint: placementHint(result, props.domain),
     }
   })
@@ -89,6 +90,7 @@ function ariaLabel(row: (typeof rows.value)[number]): string {
             <template v-if="row.result.valid">
               <span class="u" :style="{ width: `${row.usableShare * 100}%` }" />
               <span class="p" :style="{ width: `${row.protectionShare * 100}%` }" />
+              <span v-if="row.unusableShare > 0" class="x" :style="{ width: `${row.unusableShare * 100}%` }" />
             </template>
             <span v-else-if="row.hint" class="needs">
               {{ row.hint.needs }}<span v-if="row.hint.reserve" class="reserve"> ({{ row.hint.reserve }})</span>
@@ -241,6 +243,13 @@ $cols: minmax(9.5rem, 1.3fr) minmax(5rem, 1.4fr) 5.2rem 3.4rem 4.4rem 3.8rem;
   .p {
     background: var(--protection);
     opacity: 0.75;
+    transition: width 0.3s;
+  }
+
+  // Unusable space at the right end; the reserved headroom shows through in between.
+  .x {
+    margin-left: auto;
+    background: repeating-linear-gradient(135deg, var(--unusable) 0 4px, var(--unusable-stripe) 4px 5px);
     transition: width 0.3s;
   }
 

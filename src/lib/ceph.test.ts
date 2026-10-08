@@ -23,6 +23,7 @@ describe('computeCapacity', () => {
     expect(r.protectionTB).toBeCloseTo(145.07, 1)
     expect(r.reserved.recoveryReserveTB).toBe(64)
     expect(r.reserved.nearfullHeadroomTB).toBeCloseTo(38.4, 6)
+    expect(r.unusableTB).toBe(0)
     expect(r.usableTB + r.protectionTB + r.reservedTB).toBeCloseTo(r.rawTB, 6)
   })
 
@@ -51,8 +52,18 @@ describe('computeCapacity', () => {
       unplacedTB: 0,
     }
     const r = computeCapacity(input, rep3, { fullRatio: 1, backfillfullRatio: 1, nearfullRatio: 1, recoveryReserve: 0 })
-    expect(r.reserved.strandedTB).toBeCloseTo(90, 6)
+    expect(r.unusable.strandedTB).toBeCloseTo(90, 6)
+    expect(r.unusableTB).toBeCloseTo(90, 6)
+    expect(r.reservedTB).toBeCloseTo(0, 6)
     expect(r.usableTB).toBeCloseTo(10, 6)
+  })
+
+  it('reports stranded space as unusable, not reserved: 3 × 10 TB + 20 TB, 3x, no reserve', () => {
+    const input = { groups: [{ capTB: 20, mult: 1 }, { capTB: 10, mult: 3 }], unplacedTB: 0 }
+    const r = computeCapacity(input, rep3, { fullRatio: 1, backfillfullRatio: 1, nearfullRatio: 1, recoveryReserve: 0 })
+    expect(r.unusableTB).toBeCloseTo(5, 9)
+    expect(r.reservedTB).toBeCloseTo(0, 9)
+    expect(r.usableTB).toBeCloseTo(15, 9)
   })
 
   it('reserves the largest domain for the recovery reserve', () => {
@@ -64,12 +75,33 @@ describe('computeCapacity', () => {
       unplacedTB: 0,
     }
     const r = computeCapacity(input, rep3, { fullRatio: 1, backfillfullRatio: 1, nearfullRatio: 1, recoveryReserve: 1 })
-    expect(r.reserved.recoveryReserveTB).toBe(50)
-    expect(r.reserved.strandedTB).toBeCloseTo(0, 6)
+    // Healthy, the 50 TB host can hold at most 40 TB (a third of 120 TB): 10 TB are never
+    // usable, and planning without it costs the remaining 40 TB.
+    expect(r.unusable.strandedTB).toBeCloseTo(10, 6)
+    expect(r.reserved.recoveryReserveTB).toBeCloseTo(40, 6)
     expect(r.usableTB).toBeCloseTo(80 / 3, 6)
   })
 
-  it('counts unplaced capacity as reserved', () => {
+  it('keeps every part non-negative and adding up to raw', () => {
+    const layouts = [
+      [{ capTB: 40, mult: 1 }, { capTB: 30, mult: 1 }, { capTB: 10, mult: 3 }],
+      [{ capTB: 32, mult: 1 }, { capTB: 9, mult: 3 }],
+      [{ capTB: 100, mult: 1 }, { capTB: 10, mult: 5 }],
+      [{ capTB: 8, mult: 6 }],
+    ]
+    for (const groups of layouts) {
+      for (const recoveryReserve of [0, 1, 2]) {
+        const r = computeCapacity({ groups, unplacedTB: 7 }, rep3, { fullRatio: 0.95, backfillfullRatio: 0.9, nearfullRatio: 0.85, recoveryReserve })
+        if (!r.valid) continue
+        const parts = [r.usableTB, r.protectionTB, ...Object.values(r.reserved), ...Object.values(r.unusable)]
+        expect(Math.min(...parts)).toBeGreaterThanOrEqual(0)
+        expect(r.usableTB + r.protectionTB + r.reservedTB + r.unusableTB).toBeCloseTo(r.rawTB, 6)
+        expect(r.unusable.strandedTB).toBeCloseTo(r.rawTB - 7 - r.healthyPlaceableTB, 6)
+      }
+    }
+  })
+
+  it('counts unplaced capacity as unusable', () => {
     const r = computeCapacity({ groups: [{ capTB: 10, mult: 3 }], unplacedTB: 20 }, rep3, {
       fullRatio: 1,
       backfillfullRatio: 1,
@@ -78,7 +110,8 @@ describe('computeCapacity', () => {
     })
     expect(r.rawTB).toBe(50)
     expect(r.usableTB).toBeCloseTo(10, 6)
-    expect(r.reservedTB).toBe(20)
+    expect(r.unusableTB).toBe(20)
+    expect(r.reservedTB).toBe(0)
   })
 })
 
@@ -111,10 +144,12 @@ describe('FAQ mixed-size example', () => {
     const ratios = { fullRatio: 0.95, backfillfullRatio: 0.9, nearfullRatio: 0.85 }
     const full = computeCapacity(mixed, rep3, { fullRatio: 1, backfillfullRatio: 1, nearfullRatio: 1, recoveryReserve: 0 })
     expect(full.usableTB).toBeCloseTo(15, 9)
-    expect(full.reserved.strandedTB).toBeCloseTo(5, 9)
+    expect(full.unusable.strandedTB).toBeCloseTo(5, 9)
     expect(computeCapacity(mixed, rep3, { ...ratios, recoveryReserve: 0 }).usableTB).toBeCloseTo(12.75, 9)
     const reserved = computeCapacity(mixed, rep3, { ...ratios, recoveryReserve: 1 })
-    expect(reserved.reserved.recoveryReserveTB).toBe(20)
+    // 5 TB of the 20 TB host can never be filled; the reserve costs the other 15 TB.
+    expect(reserved.unusable.strandedTB).toBeCloseTo(5, 9)
+    expect(reserved.reserved.recoveryReserveTB).toBeCloseTo(15, 9)
     expect(reserved.usableTB).toBeCloseTo(8.5, 9)
   })
 })
@@ -226,7 +261,7 @@ describe('fill ratios', () => {
       for (const reserve of [0, 1]) {
         const r = computeCapacity(basic(hosts, 8, 8), rep3, { ...ratios, recoveryReserve: reserve })
         expect(r.usableTB + r.protectionTB).toBeLessThanOrEqual(r.healthyPlaceableTB * r.fillRatios.nearfull + 1e-9)
-        expect(r.usableTB + r.protectionTB + r.reservedTB).toBeCloseTo(r.rawTB, 6)
+        expect(r.usableTB + r.protectionTB + r.reservedTB + r.unusableTB).toBeCloseTo(r.rawTB, 6)
       }
     }
   })

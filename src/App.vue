@@ -114,9 +114,9 @@ const warnings = computed(() => {
   } else if (fd === 'osd' && stats.value.counts.host > 1) {
     list.push('Failure domain osd: one host failure can take out several copies of the same object.')
   }
-  if (r.valid && r.reserved.strandedTB > r.rawTB * 0.01) {
+  if (r.valid && r.unusable.strandedTB > r.rawTB * 0.01) {
     list.push(
-      `${formatCapacity(r.reserved.strandedTB)} stranded: the largest ${plural(fd, 1)} is too big relative to the others for a ${r.width}-wide scheme.`,
+      `${formatCapacity(r.unusable.strandedTB)} stranded: the largest ${plural(fd, 1)} is too big relative to the others for a ${r.width}-wide scheme.`,
     )
   }
   const balance = domainBalance(domains.value.groups)

@@ -2,7 +2,7 @@
 
 A Vue 3 web tool that calculates the **real net capacity** of a Ceph pool on a given topology: the data you
 can store while every OSD stays below the nearfull ratio, even after recovering from failures. It also shows
-**protection overhead, reserved margins, efficiency, tolerated failures and minimum failure domains**.
+**protection overhead, reserved and unusable space, efficiency, tolerated failures and minimum failure domains**.
 
 Source: <https://github.com/cytrinox/ceph-calc>
 
@@ -23,7 +23,8 @@ Source: <https://github.com/cytrinox/ceph-calc>
   compression ratio, default 0.90, shown as an effective-capacity badge), quotas, and the `nodelete` /
   `nosizechange` flags. Leave the rule or profile name empty to get a derived name such as `rep3_host`
   or `ec-4-2-rack-nvme`.
-- Raw data distribution bar: usable, protection and reserved margins, with markers where a healthy cluster
+- Raw data distribution bar: usable data, protection overhead, reserved headroom (kept free on purpose) and,
+  when there is any, unusable space (yellow; can never be filled), with markers where a healthy cluster
   reaches the nearfull, backfillfull and full ratios. Below the usable share, `+X until backfillfull` /
   `+X until full` shows how much more data fits before those limits.
 - Comparison table of all presets on the current topology, plus a chart: usable capacity as a line (TB on the
@@ -52,11 +53,13 @@ Source: <https://github.com/cytrinox/ceph-calc>
 | `N` | recovery reserve (failure domains whose capacity is kept free) |
 
 1. **Raw** = sum of all OSD sizes.
-2. **Recovery reserve**: the capacity of the `N` largest failure domains, which is the worst case to recover from.
-3. **Placement limit (water-filling)**: every object stores exactly one shard in each of `w` distinct
+2. **Placement limit (water-filling)**: every object stores exactly one shard in each of `w` distinct
    failure domains, so a domain can never hold more than `1/w` of the stored data. Space that oversized
-   domains can never fill is reported as *stranded*. Capacity outside any bucket of the failure-domain
-   type is reported as *outside failure domains*.
+   domains can never fill, even in a healthy cluster, is reported as *stranded*. Capacity outside any bucket
+   of the failure-domain type is reported as *outside failure domains*. Both are **unusable**.
+3. **Recovery reserve**: the `N` largest failure domains are taken out, as the worst case to recover from. The
+   reserve is the fillable capacity this gives up: `healthy placeable − placeable after losing N` (for equal
+   domains simply the capacity of `N` domains).
 4. **Fill limit**: after losing the `N` largest failure domains and re-replicating their data onto the rest,
    the surviving OSDs must still be below **nearfull**: stored = `placeable after losing N × nearfull_ratio`.
    The nearfull headroom is never used to absorb recovery data, so every reserved domain costs capacity.
@@ -64,7 +67,9 @@ Source: <https://github.com/cytrinox/ceph-calc>
    the generated commands.
 5. **Usable** = stored × `f`. **Protection** = stored × `(1 − f)`. The triangles above the capacity bar mark where
    a healthy cluster reaches each ratio: `healthy placeable × ratio` as a share of raw.
-6. **Reserved margins** = recovery reserve + stranded + nearfull headroom + outside. Usable + protection + reserved = raw.
+6. **Reserved headroom** = recovery reserve + nearfull headroom (kept free on purpose).
+   **Unusable** = stranded + outside failure domains (can never be filled).
+   Usable + protection + reserved + unusable = raw.
 7. **Efficiency** = usable / raw. **Failures tolerated** = `size − 1` or `m`
    (I/O continues through `size − min_size`; EC uses Ceph's default `min_size = k + min(1, m − 1)`, i.e. `k + 1`,
    or `k` when `m = 1`). **Min domains** = `w + N`.
