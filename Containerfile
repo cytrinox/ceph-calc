@@ -1,7 +1,9 @@
 # syntax=docker/dockerfile:1
 
 # ---- Build stage -----------------------------------------------------------
-FROM docker.io/library/node:22-alpine AS build
+# Runs on the build machine's native platform: the output is static files that work on
+# every architecture, so multi-arch builds need no emulation for npm/vite/vitest.
+FROM --platform=$BUILDPLATFORM docker.io/library/node:22-alpine AS build
 WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund

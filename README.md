@@ -85,7 +85,8 @@ podman run --rm -p 8080:8080 ceph-calculator
 ## Continuous integration
 
 `.github/workflows/container.yml` builds the image with the `Containerfile` (the unit tests run inside the
-build) and publishes it to the GitHub Container Registry as `ghcr.io/<owner>/ceph-calc`:
+build) and publishes it to the GitHub Container Registry as `ghcr.io/<owner>/ceph-calc`, for `linux/amd64`
+and `linux/arm64`:
 
 | Trigger | Image tag |
 | --- | --- |
