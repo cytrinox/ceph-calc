@@ -270,10 +270,13 @@ watch(
         </span>
       </p>
       <p class="license">
-        Free software, licensed under the
-        <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener noreferrer">GNU GPL v3.0</a>
-        ·
-        <a href="https://github.com/cytrinox/ceph-calc" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
+        <AppIcon name="scale" :size="14" />
+        <span>
+          Free software, licensed under the
+          <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener noreferrer">GNU GPL v3.0</a>
+          ·
+          <a href="https://github.com/cytrinox/ceph-calc" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
+        </span>
       </p>
     </footer>
   </div>
@@ -384,24 +387,24 @@ watch(
     margin: 0;
   }
 
-  .disclaimer {
-    max-width: 62rem;
+  // Notes that wrap keep their icon next to the first line.
+  .disclaimer,
+  .license {
     align-items: flex-start;
 
     svg {
       flex: 0 0 auto;
       margin-top: 0.15rem;
     }
+  }
+
+  .disclaimer {
+    max-width: 62rem;
 
     strong {
       color: var(--text-muted);
       font-weight: 600;
     }
-  }
-
-  // Plain inline text, so the link and the full stop are not spaced apart like flex items.
-  p.license {
-    display: block;
   }
 
   code {

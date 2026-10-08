@@ -22,6 +22,7 @@ export type IconName =
   | 'download'
   | 'share'
   | 'help'
+  | 'scale'
 
 defineProps<{ name: IconName; size?: number }>()
 
@@ -48,6 +49,7 @@ const PATHS: Record<IconName, string> = {
   help: 'M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z',
   share: 'M10 14a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5M14 10a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5',
   alert: 'M12 9v4m0 4h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',
+  scale: 'M12 4v16M8 20h8M5 7h14M5 7l-2.5 7M5 7l2.5 7M2.5 14a2.5 2.5 0 0 0 5 0zM19 7l-2.5 7M19 7l2.5 7M16.5 14a2.5 2.5 0 0 0 5 0z',
 }
 </script>
 
