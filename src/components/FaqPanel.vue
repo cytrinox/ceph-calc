@@ -227,6 +227,10 @@ import { FAQ_IDS } from '@/lib/faq'
             or partial writes reads less.
           </p>
           <p>
+            <code>fast_read</code> lowers the latency of single reads (any k of the k+m replies are enough) but costs m
+            extra OSD reads per request, so the IOPS ceiling drops. With EC optimizations the estimate ignores it.
+          </p>
+          <p>
             <code>d</code> is the number of data shards a request touches: ⌈I/O size ÷ <code>stripe_unit</code>⌉, at
             most k. A 4K request always fits into one strip (<code>d</code> = 1); a 64K request with a 16K
             <code>stripe_unit</code> touches 4 shards. A request covering whole stripes (a multiple of
