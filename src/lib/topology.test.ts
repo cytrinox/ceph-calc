@@ -149,6 +149,15 @@ describe('topology', () => {
     expect([decoded.nearfullRatio, decoded.backfillfullRatio, decoded.fullRatio]).toEqual([0, 0.4, 1])
   })
 
+  it('clamps all ratios to 0–1 when encoding a link', () => {
+    const state = defaultState()
+    state.nearfullRatio = -0.2
+    state.backfillfullRatio = 1.4
+    state.fullRatio = 7
+    const decoded = decodeState(encodeState(state))!
+    expect([decoded.nearfullRatio, decoded.backfillfullRatio, decoded.fullRatio]).toEqual([0, 1, 1])
+  })
+
   it('has an example using every bucket type', () => {
     const t = example('all-types')
     expect(presentTypes(t)).toEqual([...BUCKET_TYPES])

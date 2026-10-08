@@ -86,7 +86,11 @@ interface Packed {
 
 /** A fill ratio from untrusted input, clamped to 0–1; the fallback when missing or not a number. */
 function ratioOr(value: unknown, fallback: number): number {
-  return typeof value === 'number' && Number.isFinite(value) ? Math.min(1, Math.max(0, value)) : fallback
+  return typeof value === 'number' && Number.isFinite(value) ? clampRatio(value) : fallback
+}
+
+function clampRatio(value: unknown): number {
+  return Math.min(1, Math.max(0, num(value)))
 }
 
 function pick<T extends string>(allowed: readonly T[], value: unknown, fallback: T): T {
@@ -187,9 +191,9 @@ export function encodeState(state: AppState): string {
       state.scheme.kind === 'replicated'
         ? [0, int(state.scheme.size), int(state.scheme.minSize)]
         : [1, int(state.scheme.k), int(state.scheme.m)],
-    f: Math.min(1, num(state.fullRatio)),
-    bf: num(state.backfillfullRatio),
-    nf: num(state.nearfullRatio),
+    f: clampRatio(state.fullRatio),
+    bf: clampRatio(state.backfillfullRatio),
+    nf: clampRatio(state.nearfullRatio),
     h: int(state.healDomains),
     p: state.pool,
     pt: num(state.pricePerTB),
