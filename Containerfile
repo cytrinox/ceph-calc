@@ -13,14 +13,14 @@ RUN npm run test && npm run build
 # ---- Runtime stage ---------------------------------------------------------
 FROM docker.io/nginxinc/nginx-unprivileged:stable-alpine
 
-LABEL org.opencontainers.image.title="ceph-calculator" \
-      org.opencontainers.image.description="Ceph storage capacity calculator (static web app)" \
+LABEL org.opencontainers.image.title="ceph-calc" \
+      org.opencontainers.image.description="The ceph real net capacity calculator" \
       org.opencontainers.image.licenses="GPL-3.0-only" \
       org.opencontainers.image.source="https://github.com/cytrinox/ceph-calc"
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 COPY --from=build /app/dist /usr/share/nginx/html
-COPY LICENSE /usr/share/licenses/ceph-calculator/LICENSE
+COPY LICENSE /usr/share/licenses/ceph-calc/LICENSE
 
 USER 101
 EXPOSE 8080

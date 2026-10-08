@@ -75,8 +75,8 @@ The image is built with a multi-stage `Containerfile`: Node builds the app, and
 `nginx-unprivileged` serves it as a non-root user (UID 101) on port 8080.
 
 ```sh
-podman build -t ceph-calculator -f Containerfile .
-podman run --rm -p 8080:8080 ceph-calculator
+podman build -t ceph-calc -f Containerfile .
+podman run --rm -p 8080:8080 ceph-calc
 # open http://localhost:8080  (health check: /healthz)
 ```
 
