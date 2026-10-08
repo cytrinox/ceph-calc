@@ -82,8 +82,16 @@ function duplicate() {
 
 function split() {
   const n = int(props.bucket.count)
-  if (n > SPLIT_LIMIT && !confirm(`Splitting is limited to ${SPLIT_LIMIT} copies. Continue?`)) return
-  if (n > 50 && n <= SPLIT_LIMIT && !confirm(`Create ${n} individual ${plural(props.bucket.type, n)}?`)) return
+  const type = props.bucket.type
+  if (n > SPLIT_LIMIT) {
+    const rest = n - (SPLIT_LIMIT - 1)
+    const question =
+      `Split into ${formatInt(SPLIT_LIMIT - 1)} individual ${plural(type)} plus one ${type} ×${formatInt(rest)}? ` +
+      `(splitting creates at most ${formatInt(SPLIT_LIMIT)} entries)`
+    if (!confirm(question)) return
+  } else if (n > 50 && !confirm(`Create ${formatInt(n)} individual ${plural(type, n)}?`)) {
+    return
+  }
   splitBucket(props.siblings, props.index, usedNames())
 }
 

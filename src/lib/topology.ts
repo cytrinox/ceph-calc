@@ -166,14 +166,21 @@ export function cloneBucket(bucket: Bucket, used: Set<string>): Bucket {
 
 export const SPLIT_LIMIT = 500
 
-/** Replace siblings[index] (×N) by N individual buckets. Returns the number created. */
+/**
+ * Replace siblings[index] (×N) by individual buckets. At most SPLIT_LIMIT entries are created:
+ * above that, the last entry keeps the remaining copies (×rest), so the total is never reduced.
+ * Returns the number of entries.
+ */
 export function splitBucket(siblings: Bucket[], index: number, used: Set<string>): number {
   const original = siblings[index]
-  const n = Math.min(int(original.count), SPLIT_LIMIT)
+  const total = int(original.count)
+  const n = Math.min(total, SPLIT_LIMIT)
   if (n <= 1) return 0
   original.count = 1
   const copies: Bucket[] = []
   for (let i = 1; i < n; i++) copies.push(cloneBucket(original, used))
+  // Copies beyond the limit stay together in the last entry.
+  copies[copies.length - 1].count = total - (n - 1)
   siblings.splice(index + 1, 0, ...copies)
   return n
 }

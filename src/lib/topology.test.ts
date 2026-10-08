@@ -12,6 +12,7 @@ import {
   nextFreeName,
   presentTypes,
   splitBucket,
+  SPLIT_LIMIT,
   topologyStats,
   TOPOLOGY_EXAMPLES,
   UNBALANCED_SPREAD,
@@ -71,6 +72,20 @@ describe('topology', () => {
     expect(t.map((b) => b.name)).toEqual(['rack01', 'rack02', 'rack03', 'rack04'])
     expect(t.every((b) => b.count === 1)).toBe(true)
     expect(nextFreeName('dc', new Set(['dc']))).toBe('dc2')
+  })
+
+  it('never loses copies when splitting above the limit', () => {
+    const big = [newBucket('rack', 'rack01', { count: 1000, children: [newBucket('host', 'host01', { count: 4 })] })]
+    const before = topologyStats(big)
+    expect(splitBucket(big, 0, collectNames(big))).toBe(SPLIT_LIMIT)
+    expect(big).toHaveLength(SPLIT_LIMIT)
+    expect(big.reduce((n, b) => n + b.count, 0)).toBe(1000)
+    expect(big[big.length - 1].count).toBe(1000 - (SPLIT_LIMIT - 1))
+    expect(topologyStats(big)).toEqual(before)
+
+    const small = [newBucket('rack', 'rack01', { count: 300 })]
+    expect(splitBucket(small, 0, collectNames(small))).toBe(300)
+    expect(small.every((b) => b.count === 1)).toBe(true)
   })
 
   it('restricts child types to lower CRUSH types', () => {
