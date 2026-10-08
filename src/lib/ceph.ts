@@ -229,7 +229,7 @@ export function dataUntilRatio(result: CapacityResult, ratio: 'backfillfull' | '
 export interface PlacementHint {
   /** e.g. "needs 8 hosts" */
   needs: string
-  /** e.g. "+ 2 recovery reserve" when only the recovery reserve is missing, else null. */
+  /** e.g. "+ 2 recovery reserve" whenever a recovery reserve is set, else null. */
   reserve: string | null
 }
 

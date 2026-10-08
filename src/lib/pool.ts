@@ -1,4 +1,5 @@
-// Pool-level settings used to describe (and later generate commands for) the Ceph pool.
+// Pool-level settings (step 4): options, defaults, derived rule/profile names, PG suggestion and
+// validation. commands.ts turns them into Ceph commands.
 
 import { schemeWidth, type Scheme } from './ceph'
 import type { DomainType } from './topology'
