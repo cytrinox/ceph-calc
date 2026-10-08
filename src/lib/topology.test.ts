@@ -53,12 +53,16 @@ describe('topology', () => {
     expect(d.unplacedHosts).toBe(1)
   })
 
-  it('builds basic topologies individually or with a multiplier', () => {
-    expect(buildBasicTopology({ hosts: 5, osdsPerHost: 8, osdSizeTB: 8 })).toHaveLength(5)
+  it('builds the basic hosts as one host with a multiplier', () => {
+    const small = buildBasicTopology({ hosts: 5, osdsPerHost: 8, osdSizeTB: 8 })
+    expect(small).toHaveLength(1)
+    expect(small[0]).toMatchObject({ type: 'host', name: 'host01', count: 5 })
+    expect(topologyStats(small)).toMatchObject({ rawTB: 320, counts: { host: 5, osd: 40 } })
     const big = buildBasicTopology({ hosts: 100, osdsPerHost: 8, osdSizeTB: 8 })
     expect(big).toHaveLength(1)
-    expect(big[0].count).toBe(100)
+    expect(big[0]).toMatchObject({ name: 'host001', count: 100 })
     expect(topologyStats(big).counts.osd).toBe(800)
+    expect(buildBasicTopology({ hosts: 0, osdsPerHost: 8, osdSizeTB: 8 })).toEqual([])
   })
 
   it('generates unique names and ids when duplicating and splitting', () => {

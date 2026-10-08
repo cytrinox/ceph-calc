@@ -332,21 +332,13 @@ export const UNBALANCED_SPREAD = 0.25
 // ---------------------------------------------------------------------------
 // Builders
 
-/** Threshold below which hosts are generated individually instead of as host ×N. */
-export const EXPAND_HOSTS_LIMIT = 32
-
+/** The Basic hosts as one host ×N; split it in the tree to edit hosts individually. */
 export function buildBasicTopology(basic: BasicTopology): Topology {
   const hosts = int(basic.hosts)
-  const osds = [newOsdGroup(int(basic.osdsPerHost), num(basic.osdSizeTB))]
   if (hosts === 0) return []
-  const width = Math.max(2, String(hosts).length)
-  const name = (i: number) => `host${String(i).padStart(width, '0')}`
-  if (hosts > EXPAND_HOSTS_LIMIT) {
-    return [newBucket('host', name(1), { count: hosts, osds })]
-  }
-  return Array.from({ length: hosts }, (_, i) =>
-    newBucket('host', name(i + 1), { osds: osds.map((o) => ({ ...o, id: uid() })) }),
-  )
+  // Pad like the names split copies get, e.g. host001 for 100+ hosts.
+  const name = `host${'1'.padStart(Math.max(2, String(hosts).length), '0')}`
+  return [newBucket('host', name, { count: hosts, osds: [newOsdGroup(int(basic.osdsPerHost), num(basic.osdSizeTB))] })]
 }
 
 /** 2 datacenters: dc1 with 3 rows, dc2 with 7 rows; 20 racks/row, 20 hosts/rack, 10 × 16 TB/host. */
