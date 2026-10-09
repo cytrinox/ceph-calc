@@ -227,6 +227,14 @@ describe('placementHint', () => {
   })
 })
 
+describe('EC profile limits', () => {
+  it('rejects k < 2 like Ceph (k=1 must be >= 2)', () => {
+    const t = { fullRatio: 0.95, backfillfullRatio: 0.9, nearfullRatio: 0.85, recoveryReserve: 0 }
+    expect(computeCapacity(basic(4, 8, 8), { kind: 'ec', k: 1, m: 1 }, t).valid).toBe(false)
+    expect(computeCapacity(basic(4, 8, 8), { kind: 'ec', k: 2, m: 1 }, t).valid).toBe(true)
+  })
+})
+
 describe('min_size defaults', () => {
   it('uses k+1 for EC with m >= 2 and k for m = 1', () => {
     expect(schemeMinSize({ kind: 'ec', k: 4, m: 2 })).toBe(5)

@@ -202,7 +202,7 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
             />
           </template>
           <template v-else>
-            <NumberField v-model="state.scheme.k" label="k" hint="Data chunks per object" :min="1" :max="32" />
+            <NumberField v-model="state.scheme.k" label="k" hint="Data chunks per object" :min="2" :max="32" />
             <NumberField v-model="state.scheme.m" label="m" hint="Parity chunks per object" :min="1" :max="16" />
             <NumberField
               v-model="ecMinSize"

@@ -123,8 +123,9 @@ export function isSchemeValid(s: Scheme): boolean {
   }
   const minSize = schemeMinSize(s)
   return (
+    // Ceph's EC plugins reject k < 2 and m < 1 (ErasureCode::sanity_check_k_m).
     Number.isInteger(s.k) &&
-    s.k >= 1 &&
+    s.k >= 2 &&
     Number.isInteger(s.m) &&
     s.m >= 1 &&
     // Ceph accepts k ≤ min_size ≤ k+m for EC pools.

@@ -187,6 +187,12 @@ describe('topology', () => {
     expect(decodeState(encodeState(state))!.ioSizeKiB).toBe(4)
   })
 
+  it('raises k = 1 from a shared link to the Ceph minimum of 2', () => {
+    const state = defaultState()
+    state.scheme = { kind: 'ec', k: 1, m: 1 }
+    expect(decodeState(encodeState(state))!.scheme).toEqual({ kind: 'ec', k: 2, m: 1 })
+  })
+
   it('stores a non-default EC min_size in shared links', () => {
     const state = defaultState()
     state.scheme = { kind: 'ec', k: 4, m: 2, minSize: 4 }

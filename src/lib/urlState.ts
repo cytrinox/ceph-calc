@@ -255,7 +255,7 @@ export function decodeState(data: string): AppState | null {
       state.scheme =
         p.s[0] === 0
           ? { kind: 'replicated', size: Math.max(1, int(p.s[1])), minSize: Math.max(1, int(p.s[2])) }
-          : ecScheme(Math.max(1, int(p.s[1])), Math.max(1, int(p.s[2])), p.s[3])
+          : ecScheme(Math.max(2, int(p.s[1])), Math.max(1, int(p.s[2])), p.s[3])
     }
     state.fullRatio = ratioOr(p.f, state.fullRatio)
     state.backfillfullRatio = ratioOr(p.bf, state.backfillfullRatio)
