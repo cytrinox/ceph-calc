@@ -181,6 +181,8 @@ IOPS  = N_eff / (reads / R + writes / W)   (R, W = per-OSD read / write IOPS at 
   `CEPH_CALC_VERSION` wins as-is, else `git describe --tags --long` (or `CEPH_CALC_GIT_DESCRIBE`, for builds without
   `.git` such as the container) gives `v1.2.3` / `v1.2.3+5`; no matching tag means no label. CI fetches full history
   and passes the describe output as a build argument.
+  The channel badge works the same way: `__APP_CHANNEL__` from `channelLabel(CEPH_CALC_CHANNEL)`, "dev" when unset;
+  CI passes `CEPH_CALC_CHANNEL=beta`.
 - **Open Graph:**
   - `index.html` uses the placeholder origin `https://ceph-calc.invalid` in `og:url` / `og:image`;
   - `nginx.conf` replaces it per request (`sub_filter`) with the request's scheme (`X-Forwarded-Proto`) and a

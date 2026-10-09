@@ -50,7 +50,8 @@ Source: <https://github.com/cytrinox/ceph-calc>
 - FAQ panel: why the real net capacity is lower than on other calculators (with the formula and worked
   examples) and what the recovery reserve is for. The **?** buttons next to the Real net capacity heading
   and the recovery reserve field jump to the matching answer.
-- The site is marked **beta** in the title; a footer disclaimer notes that all results are estimates.
+- A release channel badge next to the title (`dev` by default, `beta` in GitHub builds) and a footer disclaimer
+  that all results are estimates.
 
 ## Calculation model
 
@@ -123,15 +124,19 @@ podman run --rm -p 8080:8080 ceph-calc
 
 `docker build -f Containerfile .` works the same way.
 
-### Version label
+### Channel badge and version label
 
-A label such as `v1.2.3` next to the beta badge shows the nearest git tag matching `vX.Y.Z` (an optional
+The badge next to the title shows the release channel from `CEPH_CALC_CHANNEL` (`alpha`, `beta`, `stable` or any
+other text); without it, `dev`. GitHub builds pass `beta`.
+
+A label such as `v1.2.3` next to the channel badge shows the nearest git tag matching `vX.Y.Z` (an optional
 pre-release suffix like `-rc.1` is allowed); builds after the tag add the commit distance (`v1.2.3+5`). Without a
 matching tag there is no label. `CEPH_CALC_VERSION` overrides it at build time:
 
 ```sh
-npm run build                              # nearest tag via git describe
+npm run build                              # badge "dev", nearest tag via git describe
 CEPH_CALC_VERSION=v2.0.0-beta npm run build    # fixed label
+CEPH_CALC_CHANNEL=stable npm run build         # badge "stable"
 ```
 
 The container build has no `.git`, so pass the tag information as a build argument:
@@ -139,7 +144,7 @@ The container build has no `.git`, so pass the tag information as a build argume
 ```sh
 podman build -t ceph-calc -f Containerfile \
   --build-arg CEPH_CALC_GIT_DESCRIBE="$(git describe --tags --long --match 'v[0-9]*.[0-9]*.[0-9]*')" .
-podman build -t ceph-calc -f Containerfile --build-arg CEPH_CALC_VERSION=v1.2.3 .
+podman build -t ceph-calc -f Containerfile --build-arg CEPH_CALC_VERSION=v1.2.3 --build-arg CEPH_CALC_CHANNEL=beta .
 ```
 
 The link-preview tags (`og:url`, `og:image`) need absolute URLs; nginx fills in the scheme and host of each request.

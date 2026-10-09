@@ -27,11 +27,12 @@ import {
   type DomainType,
 } from './lib/topology'
 import { defaultState, readStateFromUrl, writeStateToUrl, type AppState } from './lib/urlState'
-import { versionLink } from './lib/version'
+import { channelTitle, versionLink } from './lib/version'
 import { estimateIops, iopsBasis } from './lib/iops'
 
 // Same calculator pictogram as the favicon (served from public/).
 const logoUrl = `${import.meta.env.BASE_URL}favicon.svg`
+const appChannel = __APP_CHANNEL__
 const appVersion = __APP_VERSION__
 const appVersionLink = appVersion ? versionLink(appVersion) : null
 
@@ -223,10 +224,7 @@ watch(
         <div>
           <h1>
             The ceph real net capacity
-            <span class="nowrap">calculator<span
-                class="beta"
-                title="Experimental: results are estimates, please verify them before ordering hardware"
-              >beta</span
+            <span class="nowrap">calculator<span class="channel" :title="channelTitle(appChannel)">{{ appChannel }}</span
               ><a
                 v-if="appVersionLink"
                 class="version"
@@ -298,8 +296,7 @@ watch(
       <p class="disclaimer">
         <AppIcon name="alert" :size="14" />
         <span>
-          <strong>Disclaimer:</strong> this calculator is in beta. All results are estimates, provided without any
-          warranty. Please verify them before ordering hardware or changing a production cluster, and review the
+          <strong>Disclaimer:</strong> all results are estimates, provided without any warranty. Please verify them before ordering hardware or changing a production cluster, and review the
           generated commands before running them.
         </span>
       </p>
@@ -358,12 +355,12 @@ watch(
     font-size: 0.9rem;
   }
 
-  // Keeps the beta badge on the same line as the last word.
+  // Keeps the channel badge on the same line as the last word.
   .nowrap {
     white-space: nowrap;
   }
 
-  .beta {
+  .channel {
     display: inline-block;
     margin-left: 0.5rem;
     padding: 0.1rem 0.5rem;
@@ -380,7 +377,7 @@ watch(
     cursor: help;
   }
 
-  // Build version (git tag or CEPH_CALC_VERSION): a neutral pill beside the beta badge.
+  // Build version (git tag or CEPH_CALC_VERSION): a neutral pill beside the channel badge.
   .version {
     display: inline-block;
     margin-left: 0.35rem;

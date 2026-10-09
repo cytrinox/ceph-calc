@@ -1,4 +1,4 @@
-// Version label shown next to the beta badge, resolved at build time (see vite.config.ts).
+// Release channel badge and version label next to the title, resolved at build time (see vite.config.ts).
 
 /** Release tags: v1.2.3, optionally with a pre-release suffix (v2.0.0-rc.1). */
 export const VERSION_TAG = /^v\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?$/
@@ -31,4 +31,24 @@ export function versionLink(label: string): { url: string; title: string } {
   if (!VERSION_TAG.test(tag)) return { url: `${REPO_URL}/releases`, title: `Version ${label}: releases on GitHub` }
   const after = distance ? `, ${distance} ${Number(distance) === 1 ? 'commit' : 'commits'} later` : ''
   return { url: `${REPO_URL}/releases/tag/${tag}`, title: `Release ${tag} on GitHub${after}` }
+}
+
+/** Release channel badge (alpha, beta, stable, …) from CEPH_CALC_CHANNEL; "dev" when not set. */
+export function channelLabel(value: string | undefined): string {
+  return value?.trim() || 'dev'
+}
+
+/** Badge tooltip: what the channel means. */
+export function channelTitle(channel: string): string {
+  switch (channel.toLowerCase()) {
+    case 'dev':
+      return 'Development build, not a published release: results are estimates, please verify them'
+    case 'alpha':
+    case 'beta':
+      return 'Experimental: results are estimates, please verify them before ordering hardware'
+    case 'stable':
+      return 'Stable release: results are still estimates, please verify them before ordering hardware'
+    default:
+      return `Release channel: ${channel}`
+  }
 }

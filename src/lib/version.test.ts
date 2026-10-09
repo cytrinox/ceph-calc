@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { versionLabel, versionLink } from './version'
+import { channelLabel, channelTitle, versionLabel, versionLink } from './version'
 
 describe('versionLabel', () => {
   it('shows the nearest version tag, with the commit distance after it', () => {
@@ -41,5 +41,21 @@ describe('versionLink', () => {
       url: 'https://github.com/cytrinox/ceph-calc/releases',
       title: 'Version nightly: releases on GitHub',
     })
+  })
+})
+
+describe('release channel', () => {
+  it('uses the build value, "dev" when none is given', () => {
+    expect([undefined, '', '  '].map(channelLabel)).toEqual(['dev', 'dev', 'dev'])
+    expect(channelLabel(' beta ')).toBe('beta')
+    expect(channelLabel('rc1')).toBe('rc1')
+  })
+
+  it('explains the channel in the tooltip', () => {
+    expect(channelTitle('dev')).toMatch(/^Development build/)
+    expect(channelTitle('beta')).toBe('Experimental: results are estimates, please verify them before ordering hardware')
+    expect(channelTitle('BETA')).toBe(channelTitle('beta'))
+    expect(channelTitle('stable')).toMatch(/^Stable release/)
+    expect(channelTitle('rc1')).toBe('Release channel: rc1')
   })
 })

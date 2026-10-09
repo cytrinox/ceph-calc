@@ -2,7 +2,7 @@ import { execSync } from 'node:child_process'
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
-import { VERSION_TAG_GLOB, versionLabel } from './src/lib/version'
+import { VERSION_TAG_GLOB, channelLabel, versionLabel } from './src/lib/version'
 
 /**
  * `git describe` for the version label. Builds without .git (the container) get it from
@@ -22,6 +22,8 @@ function gitDescribe(): string | null {
 export default defineConfig({
   plugins: [vue()],
   define: {
+    // Channel badge (alpha, beta, stable, …); "dev" without CEPH_CALC_CHANNEL.
+    __APP_CHANNEL__: JSON.stringify(channelLabel(process.env.CEPH_CALC_CHANNEL)),
     // CEPH_CALC_VERSION overrides the label from the nearest version tag.
     __APP_VERSION__: JSON.stringify(versionLabel(process.env.CEPH_CALC_VERSION, gitDescribe())),
   },

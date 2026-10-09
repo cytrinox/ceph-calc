@@ -12,6 +12,8 @@ COPY . .
 # `git describe --tags --long --match 'v[0-9]*.[0-9]*.[0-9]*'` or a fixed label as build argument.
 ARG CEPH_CALC_GIT_DESCRIBE
 ARG CEPH_CALC_VERSION
+# Release channel badge (alpha, beta, stable, …); "dev" when not given.
+ARG CEPH_CALC_CHANNEL
 RUN npm run test && npm run build
 
 # ---- Runtime stage ---------------------------------------------------------
