@@ -18,3 +18,17 @@ export function versionLabel(override: string | undefined, describe: string | nu
   const [, tag, distance] = match
   return Number(distance) > 0 ? `${tag}+${Number(distance)}` : tag
 }
+
+export const REPO_URL = 'https://github.com/cytrinox/ceph-calc'
+
+/**
+ * Where the version label links to: the GitHub release of its tag (v1.2.3+5 → v1.2.3), or the release
+ * list for labels that are no version tag (e.g. an override like "nightly").
+ */
+export function versionLink(label: string): { url: string; title: string } {
+  const match = label.match(/^(.*?)(?:\+(\d+))?$/)!
+  const [, tag, distance] = match
+  if (!VERSION_TAG.test(tag)) return { url: `${REPO_URL}/releases`, title: `Version ${label}: releases on GitHub` }
+  const after = distance ? `, ${distance} ${Number(distance) === 1 ? 'commit' : 'commits'} later` : ''
+  return { url: `${REPO_URL}/releases/tag/${tag}`, title: `Release ${tag} on GitHub${after}` }
+}

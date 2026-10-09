@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { versionLabel } from './version'
+import { versionLabel, versionLink } from './version'
 
 describe('versionLabel', () => {
   it('shows the nearest version tag, with the commit distance after it', () => {
@@ -20,5 +20,26 @@ describe('versionLabel', () => {
     expect(versionLabel(undefined, 'v1.x-2-gabc1234')).toBe('')
     expect(versionLabel(undefined, 'release-2024-0-gabc1234')).toBe('')
     expect(versionLabel(undefined, 'v1.2.3')).toBe('') // not --long output
+  })
+})
+
+describe('versionLink', () => {
+  it('links to the GitHub release of the tag', () => {
+    expect(versionLink('v1.2.3')).toEqual({
+      url: 'https://github.com/cytrinox/ceph-calc/releases/tag/v1.2.3',
+      title: 'Release v1.2.3 on GitHub',
+    })
+    expect(versionLink('v1.2.3+5')).toEqual({
+      url: 'https://github.com/cytrinox/ceph-calc/releases/tag/v1.2.3',
+      title: 'Release v1.2.3 on GitHub, 5 commits later',
+    })
+    expect(versionLink('v2.0.0-rc.1+1').url).toBe('https://github.com/cytrinox/ceph-calc/releases/tag/v2.0.0-rc.1')
+  })
+
+  it('links other labels to the release list', () => {
+    expect(versionLink('nightly')).toEqual({
+      url: 'https://github.com/cytrinox/ceph-calc/releases',
+      title: 'Version nightly: releases on GitHub',
+    })
   })
 })

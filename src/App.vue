@@ -27,11 +27,13 @@ import {
   type DomainType,
 } from './lib/topology'
 import { defaultState, readStateFromUrl, writeStateToUrl, type AppState } from './lib/urlState'
+import { versionLink } from './lib/version'
 import { estimateIops, iopsBasis } from './lib/iops'
 
 // Same calculator pictogram as the favicon (served from public/).
 const logoUrl = `${import.meta.env.BASE_URL}favicon.svg`
 const appVersion = __APP_VERSION__
+const appVersionLink = appVersion ? versionLink(appVersion) : null
 
 const state = reactive<AppState>(readStateFromUrl() ?? defaultState())
 
@@ -219,7 +221,14 @@ watch(
                 class="beta"
                 title="Experimental: results are estimates, please verify them before ordering hardware"
               >beta</span
-              ><span v-if="appVersion" class="version" :title="`Version ${appVersion}`">{{ appVersion }}</span
+              ><a
+                v-if="appVersionLink"
+                class="version"
+                :href="appVersionLink.url"
+                :title="appVersionLink.title"
+                target="_blank"
+                rel="noopener noreferrer"
+                >{{ appVersion }}</a
             ></span>
           </h1>
           <p>Calculate the storage size of your future ceph cluster.</p>
@@ -377,6 +386,17 @@ watch(
     font-size: 0.68rem;
     font-weight: 500;
     vertical-align: 0.3em;
+    text-decoration: none;
+
+    &:hover {
+      border-color: var(--accent);
+      color: var(--accent-text);
+    }
+
+    &:focus-visible {
+      outline: 2px solid var(--accent);
+      outline-offset: 2px;
+    }
   }
 }
 
