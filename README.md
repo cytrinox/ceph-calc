@@ -166,6 +166,11 @@ git tag v1.0.0 && git push origin v1.0.0     # publishes ghcr.io/<owner>/ceph-ca
 podman run --rm -p 8080:8080 ghcr.io/cytrinox/ceph-calc:latest
 ```
 
+The same tag push also runs `.github/workflows/release.yml`: it creates a **release draft** `v1.0.0` listing the
+merged pull requests and all commits since the previous version tag (`.github/scripts/release-notes.sh`; run it
+locally to preview the commit list). Review and publish the draft on GitHub; the version label in the page links
+to it.
+
 ## License
 
 This project is licensed under the GNU General Public License v3.0 (`GPL-3.0-only`). See [LICENSE](LICENSE).

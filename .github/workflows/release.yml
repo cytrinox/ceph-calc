@@ -1,0 +1,38 @@
+# Create a GitHub release draft for every version tag.
+#
+#   git tag vX.Y.Z  ->  draft release "vX.Y.Z" with the merged PRs and all commits since the
+#                       previous version tag (.github/scripts/release-notes.sh)
+#
+# Review and publish the draft on GitHub. The container image is built by container.yml for
+# the same tag. Re-runs leave an existing release (draft or published) unchanged.
+
+name: Release draft
+
+on:
+  push:
+    tags: ['v[0-9]+.[0-9]+.[0-9]+']
+
+permissions:
+  contents: write
+
+jobs:
+  draft:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out
+        uses: actions/checkout@v4
+        with:
+          # Full history with tags for the commit list.
+          fetch-depth: 0
+
+      - name: Create the release draft
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ github.ref_name }}
+        run: |
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            echo "::notice::A release for $TAG already exists; leaving it unchanged."
+            exit 0
+          fi
+          bash .github/scripts/release-notes.sh "$TAG" > notes.md
+          gh release create "$TAG" --draft --verify-tag --title "$TAG" --notes-file notes.md

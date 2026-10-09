@@ -192,6 +192,10 @@ IOPS  = N_eff / (reads / R + writes / W)   (R, W = per-OSD read / write IOPS at 
   - `X.Y.Z` from tags `vX.Y.Z`;
   - pull requests only build.
 
+  A tag `vX.Y.Z` also creates a GitHub **release draft** (`.github/workflows/release.yml`) with GitHub's generated
+  PR list plus all non-merge commits since the previous version tag (`.github/scripts/release-notes.sh`). Re-runs
+  leave an existing release alone.
+
 ## Checking UI changes
 - **Unit tests** cover `src/lib/` only. For UI changes, build and look at the page:
   - run `npm run build && npm run preview`;
