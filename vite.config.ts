@@ -3,6 +3,7 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
 import { VERSION_TAG_GLOB, channelLabel, versionLabel } from './src/lib/version'
+import { iconsPlugin } from './build/icons'
 
 /**
  * `git describe` for the version label. Builds without .git (the container) get it from
@@ -20,7 +21,8 @@ function gitDescribe(): string | null {
 }
 
 export default defineConfig({
-  plugins: [vue()],
+  // favicon.ico, apple-touch-icon and the manifest icons are rendered from favicon.svg.
+  plugins: [vue(), iconsPlugin(fileURLToPath(new URL('./public/favicon.svg', import.meta.url)))],
   define: {
     // Channel badge (alpha, beta, stable, …); "dev" without CEPH_CALC_CHANNEL.
     __APP_CHANNEL__: JSON.stringify(channelLabel(process.env.CEPH_CALC_CHANNEL)),
@@ -40,6 +42,6 @@ export default defineConfig({
   },
   test: {
     environment: 'node',
-    include: ['src/**/*.test.ts'],
+    include: ['src/**/*.test.ts', 'build/**/*.test.ts'],
   },
 })

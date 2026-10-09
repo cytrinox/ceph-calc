@@ -124,6 +124,13 @@ podman run --rm -p 8080:8080 ceph-calc
 
 `docker build -f Containerfile .` works the same way.
 
+### Icons, manifest and 404s
+
+`favicon.ico` (16/32/48 px), `apple-touch-icon.png` and the web-manifest icons (`icon-192.png`, `icon-512.png`,
+`icon-maskable-512.png`) are rendered from `public/favicon.svg` during every build (`build/icons.ts`, also in the
+container build), so they always match the SVG; `public/site.webmanifest` lists them. The app keeps its state in the
+URL hash and has no other routes, so nginx answers unknown paths with a real 404.
+
 ### Channel badge and version label
 
 The badge next to the title shows the release channel from `CEPH_CALC_CHANNEL` (`alpha`, `beta`, `stable` or any

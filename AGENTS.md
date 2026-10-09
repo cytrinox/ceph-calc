@@ -141,6 +141,9 @@ IOPS  = N_eff / (reads / R + writes / W)   (R, W = per-OSD read / write IOPS at 
   (4 → 2 × 2 → 1 columns) and the comparison table (compact rows below 40rem, 45rem with the IOPS column).
 - **Icons:** hand-drawn single-path SVGs (24×24 viewBox, stroke 2, round caps) in `AppIcon.vue`. Add new ones there;
   there is no icon library.
+- **Favicon and app icons:** `public/favicon.svg` is the only source. `build/icons.ts` (a Vite plugin using
+  `@resvg/resvg-js`) renders `favicon.ico`, `apple-touch-icon.png` and the manifest icons at build time and serves
+  them in `npm run dev`. Keep the SVG free of `<text>` (outline lettering as paths): the build has no fonts.
 - **Hatching:** reserved headroom uses a grey hatch and unusable space a yellow-tinted hatch, in the bar and in the
   comparison mini bars.
 
@@ -175,7 +178,8 @@ IOPS  = N_eff / (reads / R + writes / W)   (R, W = per-OSD read / write IOPS at 
 
 ## Container, nginx and CI
 - **Image:** multi-stage `Containerfile`. The Node 22 build stage runs on the build platform and runs the tests; the
-  runtime is `nginx-unprivileged` on port **8080**, with `/healthz`.
+  runtime is `nginx-unprivileged` on port **8080**, with `/healthz`. Unknown paths are real 404s (`try_files … =404`):
+  the app has no routes besides `/`, so don't add an `index.html` fallback.
 - **Name:** `ceph-calc` everywhere: image, labels, package name and license path.
 - **Version label:** `vite.config.ts` defines `__APP_VERSION__` from `versionLabel()` (`src/lib/version.ts`):
   `CEPH_CALC_VERSION` wins as-is, else `git describe --tags --long` (or `CEPH_CALC_GIT_DESCRIBE`, for builds without
