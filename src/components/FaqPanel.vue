@@ -258,17 +258,17 @@ IOPS  = N_eff ÷ (reads ÷ R + writes ÷ W)</pre>
             <tbody>
               <tr>
                 <th scope="row">Replication 3x</th>
-                <td><code>12 × 200 ÷ 1</code> · <code>12 ÷ (3 ÷ 200)</code></td>
+                <td><code>12 × 200 ÷ 1</code><br /><code>12 ÷ (3 ÷ 200)</code></td>
                 <td class="num">2,400 / 800</td>
               </tr>
               <tr>
                 <th scope="row">EC 4+2</th>
-                <td><code>12 × 200 ÷ 4</code> · <code>12 ÷ (4 ÷ 200 + 6 ÷ 200)</code></td>
+                <td><code>12 × 200 ÷ 4</code><br /><code>12 ÷ (4 ÷ 200 + 6 ÷ 200)</code></td>
                 <td class="num">600 / 240</td>
               </tr>
               <tr>
                 <th scope="row">EC 4+2, optimized</th>
-                <td><code>12 × 200 ÷ 1</code> · <code>12 ÷ (3 ÷ 200 + 3 ÷ 200)</code></td>
+                <td><code>12 × 200 ÷ 1</code><br /><code>12 ÷ (3 ÷ 200 + 3 ÷ 200)</code></td>
                 <td class="num">2,400 / 400</td>
               </tr>
             </tbody>
