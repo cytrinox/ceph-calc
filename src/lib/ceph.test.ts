@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeCapacity, customEcMinSize, defaultMinSize, dataUntilRatio, placeableCapacity, placementHint, placementMessage, rawUntilRatio, ratiosOrdered, schemeMinSize, type Scheme } from './ceph'
+import { computeCapacity, customEcMinSize, defaultMinSize, emptyDomainsWarning, dataUntilRatio, placeableCapacity, placementHint, placementMessage, rawUntilRatio, ratiosOrdered, schemeMinSize, type Scheme } from './ceph'
 import { buildBasicTopology, failureDomains } from './topology'
 import { DEFAULT_SCHEME, PRESETS } from './schemes'
 
@@ -220,6 +220,23 @@ describe('placementHint', () => {
     const badScheme = computeCapacity(eight, { kind: 'replicated', size: 2, minSize: 3 }, { ...t, recoveryReserve: 0 })
     expect(placementMessage(badScheme, 'host')).toBe('The pool layout is not valid.')
     expect(placementMessage(computeCapacity(eight, rep3, t), 'host')).toBeNull()
+  })
+
+  it('names failure domains without OSDs instead of a shortage', () => {
+    const tunables = { ...t, recoveryReserve: 1 }
+    const allEmpty = computeCapacity({ groups: [], unplacedTB: 0, emptyDomains: 4 }, ec21, tunables)
+    expect(placementMessage(allEmpty, 'rack')).toBe('None of the 4 racks has any OSD capacity: add OSDs to them.')
+    const oneEmpty = computeCapacity({ groups: [], unplacedTB: 0, emptyDomains: 1 }, ec21, tunables)
+    expect(placementMessage(oneEmpty, 'rack')).toBe('The rack has no OSD capacity: add OSDs to it.')
+    const half = computeCapacity({ groups: [{ capTB: 16, mult: 2 }], unplacedTB: 0, emptyDomains: 2 }, ec21, tunables)
+    expect(placementMessage(half, 'rack')).toBe(
+      'Not enough racks with OSDs: needs 3 racks (+ 1 recovery reserve), you have 2; 2 more racks have no OSD capacity.',
+    )
+    expect(placementMessage(computeCapacity({ groups: [], unplacedTB: 0, emptyDomains: 6 }, ec21, tunables), 'osd')).toBe(
+      'All 6 OSDs have a size of 0 TB.',
+    )
+    expect(emptyDomainsWarning('rack', 2)).toBe('2 racks have no OSD capacity and are not counted as failure domains.')
+    expect(emptyDomainsWarning('host', 1)).toBe('1 host has no OSD capacity and is not counted as a failure domain.')
   })
 
   it('returns null for placeable layouts', () => {

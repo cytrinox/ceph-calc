@@ -270,6 +270,8 @@ export interface FailureDomains {
   unplacedTB: number
   /** Number of hosts not below any bucket of the failure-domain type. */
   unplacedHosts: number
+  /** Failure domains without OSD capacity: CRUSH never places data there, so they are not in `groups`. */
+  emptyDomains: number
 }
 
 /**
@@ -280,8 +282,11 @@ export function failureDomains(topology: Topology, type: DomainType): FailureDom
   const byCap = new Map<number, number>()
   let unplacedTB = 0
   let unplacedHosts = 0
+  let emptyDomains = 0
   const add = (cap: number, mult: number) => {
-    if (cap > 0 && mult > 0) byCap.set(cap, (byCap.get(cap) ?? 0) + mult)
+    if (mult <= 0) return
+    if (cap > 0) byCap.set(cap, (byCap.get(cap) ?? 0) + mult)
+    else emptyDomains += mult
   }
 
   const visit = (bucket: Bucket, parentMult: number) => {
@@ -309,7 +314,7 @@ export function failureDomains(topology: Topology, type: DomainType): FailureDom
   const groups = [...byCap.entries()]
     .map(([capTB, mult]) => ({ capTB, mult }))
     .sort((a, b) => b.capTB - a.capTB)
-  return { groups, unplacedTB, unplacedHosts }
+  return { groups, unplacedTB, unplacedHosts, emptyDomains }
 }
 
 export interface DomainBalance {

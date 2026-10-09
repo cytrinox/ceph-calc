@@ -32,6 +32,8 @@ const clampRatio = (r: number) => Math.min(1, Math.max(0, r || 0))
 export interface CapacityInput {
   groups: DomainGroup[]
   unplacedTB: number
+  /** Failure domains without OSD capacity (not in `groups`); only used for messages. */
+  emptyDomains?: number
 }
 
 /** Space kept free on purpose. */
@@ -53,6 +55,8 @@ export interface CapacityResult {
   valid: boolean
   /** Number of usable failure domains. */
   domainCount: number
+  /** Failure domains without OSD capacity, not counted in `domainCount`. */
+  emptyDomains: number
   /** Failure domains required (width + recovery reserve). */
   minDomains: number
   /** Shards/replicas per object. */
@@ -182,6 +186,7 @@ export function computeCapacity(input: CapacityInput, scheme: Scheme, tunables: 
 
   const base = {
     domainCount,
+    emptyDomains: input.emptyDomains ?? 0,
     minDomains,
     width,
     dataFraction,
@@ -298,6 +303,30 @@ export function placementMessage(result: CapacityResult, domain: DomainType): st
   const hint = placementHint(result, domain)
   if (!hint) return null
   if (result.domainCount >= result.minDomains) return 'The pool layout is not valid.'
+  const empty = result.emptyDomains
+  // The domains exist but hold nothing: say so instead of reporting a shortage of domains.
+  if (result.domainCount === 0 && empty > 0) {
+    if (domain === 'osd') return `${empty === 1 ? 'The OSD has' : `All ${formatInt(empty)} OSDs have`} a size of 0 TB.`
+    return empty === 1
+      ? `The ${plural(domain, 1)} has no OSD capacity: add OSDs to it.`
+      : `None of the ${formatInt(empty)} ${plural(domain)} has any OSD capacity: add OSDs to them.`
+  }
   const reserve = hint.reserve ? ` (${hint.reserve})` : ''
-  return `Not enough ${plural(domain)}: ${hint.needs}${reserve}, you have ${formatInt(result.domainCount)}.`
+  const shortage = `${hint.needs}${reserve}, you have ${formatInt(result.domainCount)}`
+  if (empty > 0) {
+    return `Not enough ${plural(domain)} with OSDs: ${shortage}; ${formatInt(empty)} more ${emptyDomainsText(domain, empty)}.`
+  }
+  return `Not enough ${plural(domain)}: ${shortage}.`
+}
+
+/** "2 racks have no OSD capacity", "1 OSD has a size of 0 TB" (without the count). */
+function emptyDomainsText(domain: DomainType, n: number): string {
+  const verb = n === 1 ? 'has' : 'have'
+  return `${plural(domain, n)} ${verb} ${domain === 'osd' ? 'a size of 0 TB' : 'no OSD capacity'}`
+}
+
+/** Warning for failure domains without capacity, e.g. "2 racks have no OSD capacity and are not counted …". */
+export function emptyDomainsWarning(domain: DomainType, n: number): string {
+  const counted = n === 1 ? 'is not counted as a failure domain' : 'are not counted as failure domains'
+  return `${formatInt(n)} ${emptyDomainsText(domain, n)} and ${counted}.`
 }

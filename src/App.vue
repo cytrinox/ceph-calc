@@ -8,7 +8,7 @@ import SchemeTable from './components/SchemeTable.vue'
 import ShareButton from './components/ShareButton.vue'
 import ThemeToggle from './components/ThemeToggle.vue'
 import UnitToggle from './components/UnitToggle.vue'
-import { computeCapacity, placementMessage, ratiosOrdered, schemeMinSize, type Scheme } from './lib/ceph'
+import { computeCapacity, emptyDomainsWarning, placementMessage, ratiosOrdered, schemeMinSize, type Scheme } from './lib/ceph'
 import { formatInt, formatPct, formatTB } from './lib/format'
 import { formatCapacity } from './lib/units'
 import { clusterPrice, formatPrice, pricePerUsableTB } from './lib/pricing'
@@ -71,7 +71,11 @@ watch(
 )
 
 const domains = computed(() => failureDomains(topology.value, state.failureDomain))
-const input = computed(() => ({ groups: domains.value.groups, unplacedTB: domains.value.unplacedTB }))
+const input = computed(() => ({
+  groups: domains.value.groups,
+  unplacedTB: domains.value.unplacedTB,
+  emptyDomains: domains.value.emptyDomains,
+}))
 const tunables = computed(() => ({
   fullRatio: num(state.fullRatio),
   backfillfullRatio: num(state.backfillfullRatio),
@@ -153,7 +157,9 @@ const warnings = computed(() => {
       `${formatInt(n)} ${plural('host', n)} (${formatCapacity(domains.value.unplacedTB)}) are not inside any ${fd} and cannot be used by this rule.`,
     )
   }
-  if (state.tab === 'advanced' && stats.value.emptyBuckets > 0) {
+  if (domains.value.emptyDomains > 0) {
+    list.push(emptyDomainsWarning(fd, domains.value.emptyDomains))
+  } else if (state.tab === 'advanced' && stats.value.emptyBuckets > 0) {
     list.push('Some buckets contain no OSDs.')
   }
   if (!ratiosOrdered(tunables.value)) {

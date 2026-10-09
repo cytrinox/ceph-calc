@@ -53,6 +53,16 @@ describe('topology', () => {
     expect(d.unplacedHosts).toBe(1)
   })
 
+  it('counts failure domains without OSD capacity separately', () => {
+    const empty = newBucket('rack', 'rack01', { count: 4, children: [newBucket('host', 'host01', { osds: [] })] })
+    expect(failureDomains([empty], 'rack')).toMatchObject({ groups: [], emptyDomains: 4 })
+    const filled = newBucket('rack', 'rack05', { count: 2, children: [newBucket('host', 'host05', { osds: [newOsdGroup(2, 8)] })] })
+    const half = newBucket('rack', 'rack01', { count: 2, children: [newBucket('host', 'host01', { osds: [] })] })
+    expect(failureDomains([half, filled], 'rack')).toMatchObject({ groups: [{ capTB: 16, mult: 2 }], emptyDomains: 2 })
+    const zeroOsds = newBucket('host', 'host01', { osds: [newOsdGroup(3, 0), newOsdGroup(2, 4)] })
+    expect(failureDomains([zeroOsds], 'osd')).toMatchObject({ groups: [{ capTB: 4, mult: 2 }], emptyDomains: 3 })
+  })
+
   it('builds the basic hosts as one host with a multiplier', () => {
     const small = buildBasicTopology({ hosts: 5, osdsPerHost: 8, osdSizeTB: 8 })
     expect(small).toHaveLength(1)
