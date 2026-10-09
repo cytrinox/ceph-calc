@@ -177,6 +177,10 @@ IOPS  = N_eff / (reads / R + writes / W)   (R, W = per-OSD read / write IOPS at 
 - **Image:** multi-stage `Containerfile`. The Node 22 build stage runs on the build platform and runs the tests; the
   runtime is `nginx-unprivileged` on port **8080**, with `/healthz`.
 - **Name:** `ceph-calc` everywhere: image, labels, package name and license path.
+- **Version label:** `vite.config.ts` defines `__APP_VERSION__` from `versionLabel()` (`src/lib/version.ts`):
+  `CEPH_CALC_VERSION` wins as-is, else `git describe --tags --long` (or `CEPH_CALC_GIT_DESCRIBE`, for builds without
+  `.git` such as the container) gives `v1.2.3` / `v1.2.3+5`; no matching tag means no label. CI fetches full history
+  and passes the describe output as a build argument.
 - **Open Graph:**
   - `index.html` uses the placeholder origin `https://ceph-calc.invalid` in `og:url` / `og:image`;
   - `nginx.conf` replaces it per request (`sub_filter`) with the request's scheme (`X-Forwarded-Proto`) and a

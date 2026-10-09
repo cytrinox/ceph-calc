@@ -123,6 +123,25 @@ podman run --rm -p 8080:8080 ceph-calc
 
 `docker build -f Containerfile .` works the same way.
 
+### Version label
+
+A label such as `v1.2.3` next to the beta badge shows the nearest git tag matching `vX.Y.Z` (an optional
+pre-release suffix like `-rc.1` is allowed); builds after the tag add the commit distance (`v1.2.3+5`). Without a
+matching tag there is no label. `CEPH_CALC_VERSION` overrides it at build time:
+
+```sh
+npm run build                              # nearest tag via git describe
+CEPH_CALC_VERSION=v2.0.0-beta npm run build    # fixed label
+```
+
+The container build has no `.git`, so pass the tag information as a build argument:
+
+```sh
+podman build -t ceph-calc -f Containerfile \
+  --build-arg CEPH_CALC_GIT_DESCRIBE="$(git describe --tags --long --match 'v[0-9]*.[0-9]*.[0-9]*')" .
+podman build -t ceph-calc -f Containerfile --build-arg CEPH_CALC_VERSION=v1.2.3 .
+```
+
 The link-preview tags (`og:url`, `og:image`) need absolute URLs; nginx fills in the scheme and host of each request.
 Behind a reverse proxy, pass the original `Host` header (the default in Traefik, Caddy and ingress-nginx; plain
 nginx needs `proxy_set_header Host $host`) and `X-Forwarded-Proto` for https.
@@ -138,6 +157,9 @@ and `linux/arm64`:
 | push to `main` | `latest` |
 | git tag `vX.Y.Z` | `X.Y.Z` |
 | pull request | build only, nothing is pushed |
+
+The workflow checks out the full history and passes `git describe` to the build, so the image shows its version
+label (`v1.2.3` for a tag build, `v1.2.3+5` for a later build of `main`).
 
 ```sh
 git tag v1.0.0 && git push origin v1.0.0     # publishes ghcr.io/<owner>/ceph-calc:1.0.0

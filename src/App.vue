@@ -31,6 +31,7 @@ import { estimateIops, iopsBasis } from './lib/iops'
 
 // Same calculator pictogram as the favicon (served from public/).
 const logoUrl = `${import.meta.env.BASE_URL}favicon.svg`
+const appVersion = __APP_VERSION__
 
 const state = reactive<AppState>(readStateFromUrl() ?? defaultState())
 
@@ -218,6 +219,7 @@ watch(
                 class="beta"
                 title="Experimental: results are estimates, please verify them before ordering hardware"
               >beta</span
+              ><span v-if="appVersion" class="version" :title="`Version ${appVersion}`">{{ appVersion }}</span
             ></span>
           </h1>
           <p>Calculate the storage size of your future ceph cluster.</p>
@@ -361,6 +363,20 @@ watch(
     text-transform: uppercase;
     vertical-align: 0.3em;
     cursor: help;
+  }
+
+  // Build version (git tag or CEPH_CALC_VERSION): a neutral pill beside the beta badge.
+  .version {
+    display: inline-block;
+    margin-left: 0.35rem;
+    padding: 0.1rem 0.5rem;
+    border: 1px solid var(--border-strong);
+    border-radius: 999px;
+    color: var(--text-muted);
+    font-family: $font-mono;
+    font-size: 0.68rem;
+    font-weight: 500;
+    vertical-align: 0.3em;
   }
 }
 

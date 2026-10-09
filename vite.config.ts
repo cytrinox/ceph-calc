@@ -1,9 +1,30 @@
+import { execSync } from 'node:child_process'
 import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vitest/config'
 import vue from '@vitejs/plugin-vue'
+import { VERSION_TAG_GLOB, versionLabel } from './src/lib/version'
+
+/**
+ * `git describe` for the version label. Builds without .git (the container) get it from
+ * CEPH_CALC_GIT_DESCRIBE instead; no git, no repo or no matching tag gives null (no label).
+ */
+function gitDescribe(): string | null {
+  if (process.env.CEPH_CALC_GIT_DESCRIBE) return process.env.CEPH_CALC_GIT_DESCRIBE
+  try {
+    return execSync(`git describe --tags --long --match '${VERSION_TAG_GLOB}'`, {
+      stdio: ['ignore', 'pipe', 'ignore'],
+    }).toString()
+  } catch {
+    return null
+  }
+}
 
 export default defineConfig({
   plugins: [vue()],
+  define: {
+    // CEPH_CALC_VERSION overrides the label from the nearest version tag.
+    __APP_VERSION__: JSON.stringify(versionLabel(process.env.CEPH_CALC_VERSION, gitDescribe())),
+  },
   resolve: {
     alias: { '@': fileURLToPath(new URL('./src', import.meta.url)) },
   },

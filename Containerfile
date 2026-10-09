@@ -8,6 +8,10 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci --no-audit --no-fund
 COPY . .
+# Version label (see README): .git is not in the build context, so pass the output of
+# `git describe --tags --long --match 'v[0-9]*.[0-9]*.[0-9]*'` or a fixed label as build argument.
+ARG CEPH_CALC_GIT_DESCRIBE
+ARG CEPH_CALC_VERSION
 RUN npm run test && npm run build
 
 # ---- Runtime stage ---------------------------------------------------------
