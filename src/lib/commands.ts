@@ -1,6 +1,6 @@
 // Generates the Ceph CLI commands that create a pool for the current configuration.
 
-import type { Scheme, Tunables } from './ceph'
+import { customEcMinSize, type Scheme, type Tunables } from './ceph'
 import { effectiveProfileName, effectiveRuleName, type PoolOptions } from './pool'
 import type { DomainType } from './topology'
 
@@ -120,7 +120,9 @@ export function buildCommands(input: CommandInput): CommandSection[] {
   } else if (scheme.kind === 'replicated') {
     sections.push({ id: 'redundancy', title: 'Redundancy', lines: [set('size', scheme.size), set('min_size', scheme.minSize)] })
   } else {
-    // Ceph already creates EC pools with min_size = k + min(1, m - 1), which the UI cannot change.
+    // Ceph creates EC pools with min_size = k + min(1, m - 1); only a changed value needs setting.
+    const minSize = customEcMinSize(scheme)
+    if (minSize !== null) sections.push({ id: 'redundancy', title: 'Redundancy', lines: [set('min_size', minSize)] })
     const ecLines: CommandLine[] = []
     if (pool.ecOptimizations) {
       ecLines.push({ ...set('allow_ec_optimizations', true), note: 'Ceph Tentacle or later; cannot be disabled' })

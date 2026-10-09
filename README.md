@@ -16,7 +16,8 @@ Source: <https://github.com/cytrinox/ceph-calc>
 - Miscellaneous (step 5, optional): a price per TB of raw drive capacity, empty by default, with a free-text
   currency that starts as the browser locale's symbol (`€`, `$`, `£`, `CHF`, …); once a price is set, the Real
   net capacity card shows the cluster's drive cost and the cost per usable TB.
-- Pool schemes: replication (`size`, `min_size`) or erasure coding (`k`, `m`), with common presets.
+- Pool schemes: replication (`size`, `min_size`) or erasure coding (`k`, `m`, and `min_size`, which defaults to
+  Ceph's `k + min(1, m − 1)`), with common presets.
 - Headroom: recovery reserve (free space to recover the data of N failed failure domains, capped at the
   spare domains = domains − copies/shards per object) and the nearfull (0.85), backfillfull (0.90) and full
   (0.95) ratios.
@@ -39,8 +40,8 @@ Source: <https://github.com/cytrinox/ceph-calc>
   of survives / needs, with the available failure domains as a dashed line. Click a row or column to select it.
 - Ceph commands panel: the full command sequence for the configuration (fill ratios, EC profile, CRUSH rule,
   pool create, size/min_size (replicated), EC options, autoscaler hints, compression, quotas, application,
-  protection flags), with copy-all, per-section copy and download as a shell script. EC pools keep the
-  `min_size` Ceph sets on creation.
+  protection flags), with copy-all, per-section copy and download as a shell script. EC pools only get a
+  `min_size` command when it differs from the default Ceph sets on creation.
 - Light/dark theme, responsive single-column layout on phones, and configuration stored in the URL hash;
   the **Share** button copies that link (or opens the native share sheet on phones).
 - Link previews (Open Graph / X card) with a screenshot of the calculator.
@@ -78,8 +79,8 @@ Source: <https://github.com/cytrinox/ceph-calc>
    **Unusable** = stranded + outside failure domains (can never be filled).
    Usable + protection + reserved + unusable = raw.
 7. **Efficiency** = usable / raw. **Failures tolerated** = `size − 1` or `m`
-   (I/O continues through `size − min_size`; EC uses Ceph's default `min_size = k + min(1, m − 1)`, i.e. `k + 1`,
-   or `k` when `m = 1`). **Min domains** = `w + N`.
+   (I/O continues through `size − min_size`; EC defaults to Ceph's `min_size = k + min(1, m − 1)`, i.e. `k + 1`,
+   or `k` when `m = 1`, and can be set between `k` and `k + m`). **Min domains** = `w + N`.
 
 For a uniform cluster this reduces to `raw × (D − N)/D × nearfull × f`, where `D` is the number of failure domains.
 

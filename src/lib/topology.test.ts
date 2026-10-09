@@ -187,6 +187,14 @@ describe('topology', () => {
     expect(decodeState(encodeState(state))!.ioSizeKiB).toBe(4)
   })
 
+  it('stores a non-default EC min_size in shared links', () => {
+    const state = defaultState()
+    state.scheme = { kind: 'ec', k: 4, m: 2, minSize: 4 }
+    expect(decodeState(encodeState(state))!.scheme).toEqual({ kind: 'ec', k: 4, m: 2, minSize: 4 })
+    state.scheme = { kind: 'ec', k: 4, m: 2, minSize: 5 } // Ceph's default: not stored
+    expect(decodeState(encodeState(state))!.scheme).toEqual({ kind: 'ec', k: 4, m: 2 })
+  })
+
   it('clamps all ratios to 0–1 when encoding a link', () => {
     const state = defaultState()
     state.nearfullRatio = -0.2

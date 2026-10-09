@@ -10,7 +10,7 @@ import StepSection from './StepSection.vue'
 import FaqLink from './FaqLink.vue'
 import { FAQ_IDS } from '@/lib/faq'
 import TabGroup from './TabGroup.vue'
-import { DEFAULT_RATIOS, ratiosOrdered, schemeMinSize } from '@/lib/ceph'
+import { DEFAULT_RATIOS, defaultEcMinSize, ratiosOrdered, schemeMinSize } from '@/lib/ceph'
 import { CUSTOM_EC, CUSTOM_REPLICATED, DEFAULT_PRESET_ID, PRESETS, schemeLabel, schemeSelection } from '@/lib/schemes'
 import { formatInt, formatIops } from '@/lib/format'
 import { IO_SIZES_KIB, MAX_OSD_IOPS, ioSizeLabel } from '@/lib/iops'
@@ -70,6 +70,29 @@ watch(
   (size) => {
     const s = props.state.scheme
     if (size !== null && s.kind === 'replicated' && s.minSize > size) s.minSize = size
+  },
+)
+
+// EC min_size: Ceph's default k + min(1, m - 1) unless changed; only a different value is stored.
+const ecMinSize = computed({
+  get: () => schemeMinSize(props.state.scheme),
+  set: (value: number) => {
+    const s = props.state.scheme
+    if (s.kind !== 'ec') return
+    if (value === defaultEcMinSize(s.k, s.m)) delete s.minSize
+    else s.minSize = value
+  },
+})
+
+// Keep a changed EC min_size within k..k+m; drop it once it matches the default again.
+watch(
+  () => (props.state.scheme.kind === 'ec' ? [props.state.scheme.k, props.state.scheme.m] : null),
+  () => {
+    const s = props.state.scheme
+    if (s.kind !== 'ec' || s.minSize === undefined) return
+    const clamped = Math.min(s.k + s.m, Math.max(s.k, s.minSize))
+    if (clamped === defaultEcMinSize(s.k, s.m)) delete s.minSize
+    else s.minSize = clamped
   },
 )
 
@@ -181,8 +204,16 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
           <template v-else>
             <NumberField v-model="state.scheme.k" label="k" hint="Data chunks per object" :min="1" :max="32" />
             <NumberField v-model="state.scheme.m" label="m" hint="Parity chunks per object" :min="1" :max="16" />
+            <NumberField
+              v-model="ecMinSize"
+              label="min_size"
+              hint="Shards needed to keep serving I/O"
+              :default-value="defaultEcMinSize(state.scheme.k, state.scheme.m)"
+              :min="state.scheme.k"
+              :max="state.scheme.k + state.scheme.m"
+            />
             <p class="note">
-              min_size = k + min(1, m − 1) = {{ schemeMinSize(state.scheme) }}
+              Ceph default: min_size = k + min(1, m − 1) = {{ defaultEcMinSize(state.scheme.k, state.scheme.m) }}
             </p>
           </template>
         </div>

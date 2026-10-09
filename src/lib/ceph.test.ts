@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeCapacity, defaultMinSize, dataUntilRatio, placeableCapacity, placementHint, placementMessage, rawUntilRatio, ratiosOrdered, schemeMinSize, type Scheme } from './ceph'
+import { computeCapacity, customEcMinSize, defaultMinSize, dataUntilRatio, placeableCapacity, placementHint, placementMessage, rawUntilRatio, ratiosOrdered, schemeMinSize, type Scheme } from './ceph'
 import { buildBasicTopology, failureDomains } from './topology'
 import { DEFAULT_SCHEME, PRESETS } from './schemes'
 
@@ -235,6 +235,18 @@ describe('min_size defaults', () => {
     const r = computeCapacity(basic(5, 8, 8), ec21, { fullRatio: 0.95, backfillfullRatio: 0.9, nearfullRatio: 0.85, recoveryReserve: 1 })
     expect(r.minSize).toBe(2)
     expect(r.ioFailuresTolerated).toBe(1)
+  })
+
+  it('lets EC pools use a min_size between k and k+m', () => {
+    const custom: Scheme = { kind: 'ec', k: 4, m: 2, minSize: 4 }
+    expect(schemeMinSize(custom)).toBe(4)
+    expect(customEcMinSize(custom)).toBe(4)
+    expect(customEcMinSize({ kind: 'ec', k: 4, m: 2, minSize: 5 })).toBeNull() // the default
+    expect(customEcMinSize({ kind: 'ec', k: 4, m: 2 })).toBeNull()
+    const r = computeCapacity(basic(8, 8, 8), custom, { fullRatio: 0.95, backfillfullRatio: 0.9, nearfullRatio: 0.85, recoveryReserve: 0 })
+    expect([r.valid, r.minSize, r.ioFailuresTolerated]).toEqual([true, 4, 2])
+    const tooLow = computeCapacity(basic(8, 8, 8), { kind: 'ec', k: 4, m: 2, minSize: 3 }, { fullRatio: 0.95, backfillfullRatio: 0.9, nearfullRatio: 0.85, recoveryReserve: 0 })
+    expect(tooLow.valid).toBe(false)
   })
 
   it('uses size - floor(size/2) for replication', () => {

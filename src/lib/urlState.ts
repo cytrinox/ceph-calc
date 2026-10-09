@@ -13,7 +13,7 @@ import {
   defaultPoolOptions,
   type PoolOptions,
 } from './pool'
-import { DEFAULT_RATIOS, type Scheme } from './ceph'
+import { customEcMinSize, DEFAULT_RATIOS, defaultEcMinSize, type Scheme } from './ceph'
 import { CURRENCY_MAX_LENGTH, DEFAULT_PRICE_PER_TB, localCurrency } from './pricing'
 import { DEFAULT_IO_SIZE_KIB, IO_SIZES_KIB, MAX_OSD_IOPS } from './iops'
 import {
@@ -82,7 +82,8 @@ interface Packed {
   b: [number, number, number]
   a?: PackedBucket[]
   d: number
-  s: [0, number, number] | [1, number, number]
+  /** [0, size, min_size] or [1, k, m] plus min_size when it differs from Ceph's EC default. */
+  s: [0, number, number] | [1, number, number] | [1, number, number, number]
   f: number
   bf?: number
   nf?: number
@@ -96,6 +97,21 @@ interface Packed {
 }
 
 const iops = (value: unknown) => Math.min(MAX_OSD_IOPS, int(value))
+
+function ecPacked(scheme: Extract<Scheme, { kind: 'ec' }>): Packed['s'] {
+  const minSize = customEcMinSize(scheme)
+  const base: [1, number, number] = [1, int(scheme.k), int(scheme.m)]
+  return minSize === null ? base : [...base, int(minSize)]
+}
+
+/** EC scheme from a link; a min_size equal to the default is dropped. */
+function ecScheme(k: number, m: number, minSize: unknown): Scheme {
+  const scheme: Scheme = { kind: 'ec', k, m }
+  if (typeof minSize === 'number' && Number.isFinite(minSize) && int(minSize) !== defaultEcMinSize(k, m)) {
+    scheme.minSize = Math.max(1, int(minSize))
+  }
+  return scheme
+}
 const ioSize = (value: unknown) =>
   (IO_SIZES_KIB as readonly number[]).includes(value as number) ? (value as number) : DEFAULT_IO_SIZE_KIB
 
@@ -206,7 +222,7 @@ export function encodeState(state: AppState): string {
     s:
       state.scheme.kind === 'replicated'
         ? [0, int(state.scheme.size), int(state.scheme.minSize)]
-        : [1, int(state.scheme.k), int(state.scheme.m)],
+        : ecPacked(state.scheme),
     f: clampRatio(state.fullRatio),
     bf: clampRatio(state.backfillfullRatio),
     nf: clampRatio(state.nearfullRatio),
@@ -239,7 +255,7 @@ export function decodeState(data: string): AppState | null {
       state.scheme =
         p.s[0] === 0
           ? { kind: 'replicated', size: Math.max(1, int(p.s[1])), minSize: Math.max(1, int(p.s[2])) }
-          : { kind: 'ec', k: Math.max(1, int(p.s[1])), m: Math.max(1, int(p.s[2])) }
+          : ecScheme(Math.max(1, int(p.s[1])), Math.max(1, int(p.s[2])), p.s[3])
     }
     state.fullRatio = ratioOr(p.f, state.fullRatio)
     state.backfillfullRatio = ratioOr(p.bf, state.backfillfullRatio)

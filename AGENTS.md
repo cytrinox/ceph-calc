@@ -76,7 +76,9 @@ real net = placeable(domains − N largest) × nearfull × f
   plan.
 - **`min_size`:**
   - replicated pools use the user's value;
-  - EC uses Ceph's default `k + min(1, m − 1)` (`schemeMinSize`).
+  - EC defaults to Ceph's `k + min(1, m − 1)` (`defaultEcMinSize`) and can be changed between k and k+m. The scheme
+    only carries `minSize` when it differs from the default (`customEcMinSize`), so presets still match and links
+    stay short. Always read it through `schemeMinSize()`.
 - **"Not enough failure domains" wording** comes from `placementHint()` / `placementMessage()` only (e.g. "needs 8
   hosts (+ 2 recovery reserve)"). Don't build such sentences elsewhere.
 - **First visit:** Replication 3x, recovery reserve 0, ratios 0.85 / 0.90 / 0.95, no price and no IOPS (step 5
@@ -160,7 +162,8 @@ IOPS  = N_eff / (reads / R + writes / W)   (R, W = per-OSD read / write IOPS at 
   recovery reserve, with the default ratios. A test checks that every example gives a valid layout.
 
 ### Generated commands (`commands.ts`)
-- **No `min_size` for EC pools:** Ceph already sets it on creation and the UI can't change it.
+- **EC `min_size` only when changed:** Ceph sets the default on creation, so `min_size` is emitted for EC pools only
+  when the user picked a different value.
 - **No empty sections:** push a section only when it has lines (e.g. "EC options", "Autoscaler hints").
 - **Default names:**
   - CRUSH rules: `rep3_host`, `ec4-2_rack_nvme` (k and m separated, so EC 2+11 and EC 21+1 don't collide);

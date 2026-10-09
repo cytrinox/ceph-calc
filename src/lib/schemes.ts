@@ -1,4 +1,4 @@
-import { defaultMinSize, type Scheme } from './ceph'
+import { customEcMinSize, defaultMinSize, schemeMinSize, type Scheme } from './ceph'
 
 export interface Preset {
   id: string
@@ -42,7 +42,7 @@ export const CUSTOM_EC = 'custom-ec'
 
 export function sameScheme(a: Scheme, b: Scheme): boolean {
   if (a.kind === 'replicated' && b.kind === 'replicated') return a.size === b.size && a.minSize === b.minSize
-  if (a.kind === 'ec' && b.kind === 'ec') return a.k === b.k && a.m === b.m
+  if (a.kind === 'ec' && b.kind === 'ec') return a.k === b.k && a.m === b.m && schemeMinSize(a) === schemeMinSize(b)
   return false
 }
 
@@ -59,5 +59,6 @@ export function schemeLabel(scheme: Scheme): string {
   const preset = matchPreset(scheme)
   if (preset) return preset.label
   if (scheme.kind === 'replicated') return `Replication ${scheme.size}x (min_size ${scheme.minSize})`
-  return `EC ${scheme.k}+${scheme.m}`
+  const minSize = customEcMinSize(scheme)
+  return minSize === null ? `EC ${scheme.k}+${scheme.m}` : `EC ${scheme.k}+${scheme.m} (min_size ${minSize})`
 }

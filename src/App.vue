@@ -8,7 +8,7 @@ import SchemeTable from './components/SchemeTable.vue'
 import ShareButton from './components/ShareButton.vue'
 import ThemeToggle from './components/ThemeToggle.vue'
 import UnitToggle from './components/UnitToggle.vue'
-import { computeCapacity, placementMessage, ratiosOrdered, type Scheme } from './lib/ceph'
+import { computeCapacity, placementMessage, ratiosOrdered, schemeMinSize, type Scheme } from './lib/ceph'
 import { formatInt, formatPct, formatTB } from './lib/format'
 import { formatCapacity } from './lib/units'
 import { clusterPrice, formatPrice, pricePerUsableTB } from './lib/pricing'
@@ -116,9 +116,11 @@ const warnings = computed(() => {
   if (s.kind === 'replicated') {
     if (s.size === 1) list.push('size 1 keeps a single copy: any failure loses data.')
     else if (s.minSize === 1) list.push('min_size 1 accepts writes with a single copy left; this risks data loss.')
-  } else if (s.m === 1) {
+  } else if (schemeMinSize(s) === s.k) {
     list.push(
-      'm = 1: Ceph sets min_size = k, so after one failure the pool keeps accepting writes with no redundancy left; a second failure loses data.',
+      s.m === 1 && s.minSize === undefined
+        ? 'm = 1: Ceph sets min_size = k, so after one failure the pool keeps accepting writes with no redundancy left; a second failure loses data.'
+        : `min_size = k: after ${s.m} ${s.m === 1 ? 'failure' : 'failures'} the pool keeps accepting writes with no redundancy left; one more failure loses data.`,
     )
   }
   if (fd === 'osd' && stats.value.counts.host === 1) {

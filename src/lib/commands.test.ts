@@ -106,6 +106,14 @@ describe('buildCommands', () => {
     expect(script(input({ kind: 'replicated', size: 3, minSize: 2 }, pool))).not.toContain('allow_ec_optimizations')
   })
 
+  it('sets min_size of EC pools only when it differs from the default', () => {
+    const pool = { ...defaultPoolOptions(), ecOverwrites: false, fastRead: false }
+    expect(script(input({ kind: 'ec', k: 4, m: 2, minSize: 4 }, pool))).toContain(
+      '# Redundancy\nceph osd pool set data min_size 4',
+    )
+    expect(script(input({ kind: 'ec', k: 4, m: 2, minSize: 5 }, pool))).not.toContain('min_size')
+  })
+
   it('leaves min_size of EC pools to Ceph', () => {
     const pool = { ...defaultPoolOptions(), ecOverwrites: false, fastRead: false }
     const s = script(input({ kind: 'ec', k: 2, m: 1 }, pool))

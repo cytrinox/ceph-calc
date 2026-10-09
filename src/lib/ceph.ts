@@ -5,7 +5,8 @@ import { plural, type DomainGroup, type DomainType } from './topology'
 
 export type Scheme =
   | { kind: 'replicated'; size: number; minSize: number }
-  | { kind: 'ec'; k: number; m: number }
+  /** `minSize` only when it differs from Ceph's default k + min(1, m - 1). */
+  | { kind: 'ec'; k: number; m: number; minSize?: number }
 
 export interface Tunables {
   /** OSD full ratio: writes stop when an OSD reaches this fill level. */
@@ -96,8 +97,18 @@ export function defaultMinSize(size: number): number {
   return size - Math.floor(size / 2)
 }
 
+/** Ceph's default min_size of an EC pool: k + 1, or k when m = 1. */
+export function defaultEcMinSize(k: number, m: number): number {
+  return k + Math.min(1, m - 1)
+}
+
 export function schemeMinSize(s: Scheme): number {
-  return s.kind === 'replicated' ? s.minSize : s.k + Math.min(1, s.m - 1)
+  return s.kind === 'replicated' ? s.minSize : (s.minSize ?? defaultEcMinSize(s.k, s.m))
+}
+
+/** EC min_size set by the user (differs from Ceph's default), else null. */
+export function customEcMinSize(s: Scheme): number | null {
+  return s.kind === 'ec' && s.minSize !== undefined && s.minSize !== defaultEcMinSize(s.k, s.m) ? s.minSize : null
 }
 
 export function isSchemeValid(s: Scheme): boolean {
@@ -110,7 +121,17 @@ export function isSchemeValid(s: Scheme): boolean {
       s.minSize <= s.size
     )
   }
-  return Number.isInteger(s.k) && s.k >= 1 && Number.isInteger(s.m) && s.m >= 1
+  const minSize = schemeMinSize(s)
+  return (
+    Number.isInteger(s.k) &&
+    s.k >= 1 &&
+    Number.isInteger(s.m) &&
+    s.m >= 1 &&
+    // Ceph accepts k ≤ min_size ≤ k+m for EC pools.
+    Number.isInteger(minSize) &&
+    minSize >= s.k &&
+    minSize <= s.k + s.m
+  )
 }
 
 /** The `count` largest domain capacities, descending. Groups must be sorted descending. */
