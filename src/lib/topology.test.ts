@@ -15,6 +15,7 @@ import {
   newOsdGroup,
   nextFreeName,
   presentTypes,
+  renameForType,
   splitBucket,
   SPLIT_LIMIT,
   topologyStats,
@@ -105,6 +106,18 @@ describe('topology', () => {
     const small = [newBucket('rack', 'rack01', { count: 300 })]
     expect(splitBucket(small, 0, collectNames(small))).toBe(300)
     expect(small.every((b) => b.count === 1)).toBe(true)
+  })
+
+  it('renames generated names when the bucket type changes', () => {
+    const used = new Set(['room1', 'room1-row1', 'room1-host1'])
+    // the name the + button generated follows the new type, kept unique
+    expect(renameForType('room1-row1', 'row', 'host', used)).toBe('room1-host2')
+    expect(renameForType('row3', 'row', 'rack', new Set())).toBe('rack3')
+    // only the type as a word, the last one: room1 contains no "row", and the parent's type stays
+    expect(renameForType('row1-row2', 'row', 'pdu', new Set())).toBe('row1-pdu2')
+    expect(renameForType('growth1', 'row', 'host', new Set())).toBe('growth1')
+    // names of your own are kept
+    expect(renameForType('ceph-node-a', 'host', 'rack', new Set())).toBe('ceph-node-a')
   })
 
   it('restricts child types to lower CRUSH types', () => {
@@ -297,6 +310,11 @@ describe('device classes', () => {
     const before = topologyStats(t)
     filterDeviceClass(t, 'hdd')
     expect(topologyStats(t)).toEqual(before)
+  })
+
+  it('ignores OSD groups left on a bucket that is no host any more', () => {
+    const former = newBucket('rack', 'rack9', { osds: [newOsdGroup(4, 4, 'hdd')] })
+    expect(deviceClassUsage([...tree(), former]).hdd).toEqual({ osds: 22, tb: 352 })
   })
 
   it('counts OSDs and capacity per class with multipliers', () => {

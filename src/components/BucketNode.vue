@@ -19,6 +19,7 @@ import {
   newOsdGroup,
   nextFreeName,
   plural,
+  renameForType,
   splitBucket,
   uid,
   type Bucket,
@@ -66,6 +67,8 @@ const total = computed(() => {
 
 function changeType(event: Event) {
   const type = (event.target as HTMLSelectElement).value as BucketType
+  // A generated name like room1-row1 follows the new type (room1-host1); a name of your own stays.
+  props.bucket.name = renameForType(props.bucket.name, props.bucket.type, type, usedNames())
   props.bucket.type = type
   if (type === 'host' && props.bucket.osds.length === 0) props.bucket.osds.push(newOsdGroup())
 }

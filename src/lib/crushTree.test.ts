@@ -134,6 +134,11 @@ describe('virtual CRUSH tree', () => {
     expect(crushWeightOverflow(host(7206))!.rootWeight).toBeGreaterThan(CRUSH_WEIGHT_MAX)
   })
 
+  it('only counts OSDs of hosts', () => {
+    const former = newBucket('rack', 'r', { osds: [newOsdGroup(1, 1, 'nvme')] })
+    expect(treeClasses([...buildBasicTopology({ hosts: 1, osdsPerHost: 1, osdSizeTB: 1 }), former])).toEqual(['ssd'])
+  })
+
   it('picks the largest initial weight that fits', () => {
     expect(initialWeightFor(40_000)).toBe('1')
     expect(initialWeightFor(65_535)).toBe('1')

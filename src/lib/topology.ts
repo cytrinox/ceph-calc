@@ -182,6 +182,22 @@ export function nextFreeName(name: string, used: Set<string>): string {
   return candidate
 }
 
+/**
+ * The name of a bucket whose type changes: a name that contains the old type as a word, like the generated ones
+ * (room1-row1), follows the new type (room1-host1) and stays unique in `used`. Other names are kept.
+ */
+export function renameForType(name: string, from: BucketType, to: BucketType, used: Set<string>): string {
+  const matches = [...name.matchAll(new RegExp(`(?<![A-Za-z])${from}(?![A-Za-z])`, 'g'))]
+  const last = matches.at(-1)
+  if (from === to || last?.index === undefined) return name
+  const renamed = name.slice(0, last.index) + to + name.slice(last.index + from.length)
+  if (!used.has(renamed)) {
+    used.add(renamed)
+    return renamed
+  }
+  return nextFreeName(renamed, used)
+}
+
 /** Deep copy with fresh ids; the copy and every descendant get unique names. */
 export function cloneBucket(bucket: Bucket, used: Set<string>): Bucket {
   return {
@@ -303,7 +319,8 @@ export function deviceClassUsage(topology: Topology): DeviceClassUsage {
   const visit = (b: Bucket, parentMult: number) => {
     const mult = parentMult * int(b.count)
     if (mult === 0) return
-    for (const o of b.osds) {
+    // Only hosts hold OSDs (a bucket changed from host to another type keeps its groups, unused).
+    for (const o of b.type === 'host' ? b.osds : []) {
       const u = (usage[o.deviceClass] ??= { osds: 0, tb: 0 })
       u.osds += mult * int(o.count)
       u.tb += mult * int(o.count) * num(o.sizeTB)

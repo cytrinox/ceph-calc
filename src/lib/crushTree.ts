@@ -166,7 +166,7 @@ export function crushWeightOverflow(topology: Topology): CrushWeightOverflow | n
     const n = mult * int(b.count)
     if (n === 0) return
     if (weightOf(b, '') > CRUSH_WEIGHT_MAX) over.set(b.type, (over.get(b.type) ?? 0) + n)
-    for (const o of b.osds) {
+    for (const o of b.type === 'host' ? b.osds : []) {
       if (int(o.count) === 0) continue
       osds += n * int(o.count)
       smallestTB = Math.min(smallestTB, num(o.sizeTB))
@@ -195,7 +195,7 @@ export function treeClasses(topology: Topology): string[] {
   const found: string[] = []
   const visit = (b: Bucket) => {
     if (int(b.count) === 0) return
-    for (const o of b.osds) if (int(o.count) > 0) found.push(o.deviceClass)
+    if (b.type === 'host') for (const o of b.osds) if (int(o.count) > 0) found.push(o.deviceClass)
     b.children.forEach(visit)
   }
   topology.forEach(visit)
