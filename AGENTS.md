@@ -198,7 +198,9 @@ IOPS  = N_eff / (reads / R + writes / W)   (R, W = per-OSD read / write IOPS at 
   `formatInt` / `formatPct` / `formatPrice` for the rest, and `plural(type, n)` for bucket names. Don't format by
   hand.
 - **Numeric inputs:** these are text inputs with `inputmode`, never `type="number"` (`NumberField`, `MiniStepper`).
-  They accept a comma or a dot and step with the arrow keys.
+  They accept a comma or a dot and step with the arrow keys. `NumberField` updates its model on every key and emits
+  `commit` for a finished change (blur, −/+ buttons, arrow keys, the default link). React to `commit` when a change
+  moves other fields: the fill ratios are linked that way (`linkRatios`), because typing 0.97 passes through 0.
 
 ### Styling
 - **Tokens and mixins:** `_tokens.scss` is injected into every SFC by Vite (`additionalData`). It provides

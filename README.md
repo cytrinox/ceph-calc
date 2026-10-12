@@ -28,7 +28,8 @@ Source: <https://github.com/cytrinox/ceph-calc>
   Ceph's `k + min(1, m − 1)`), with common presets.
 - Headroom: recovery reserve (free space to recover the data of N failed failure domains, capped at the
   spare domains = domains − copies/shards per object) and the nearfull (0.85), backfillfull (0.90) and full
-  (0.95) ratios.
+  (0.95) ratios. The ratios stay in order: raising one raises the ones above it, lowering one lowers the ones
+  below it.
 - Pool configuration: pool name, application, CRUSH rule name, device class (built-in, used in the tree, or
   custom), EC profile and plugin,
   EC `technique` and `stripe_unit`, `allow_ec_overwrites`, `fast_read`, `allow_ec_optimizations` (Ceph

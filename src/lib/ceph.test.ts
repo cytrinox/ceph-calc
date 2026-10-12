@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { computeCapacity, customEcMinSize, defaultMinSize, emptyDomainsWarning, dataUntilRatio, placeableCapacity, placementHint, placementMessage, rawUntilRatio, ratiosOrdered, schemeMinSize, type Scheme } from './ceph'
+import { computeCapacity, customEcMinSize, defaultMinSize, emptyDomainsWarning, dataUntilRatio, placeableCapacity, placementHint, placementMessage, rawUntilRatio, ratiosOrdered, linkRatios, schemeMinSize, type Scheme } from './ceph'
 import { buildBasicTopology, failureDomains } from './topology'
 import { DEFAULT_SCHEME, PRESETS } from './schemes'
 
@@ -337,5 +337,29 @@ describe('placeableCapacity', () => {
   it('caps several oversized domains', () => {
     // [100, 100, 10, 10] with width 3: two capped domains, S = 20 * 3 / 1 = 60
     expect(placeableCapacity([100, 100, 10], 220, 3)).toBe(60)
+  })
+})
+
+describe('linked fill ratios', () => {
+  const ratios = (nearfullRatio: number, backfillfullRatio: number, fullRatio: number) => ({
+    nearfullRatio,
+    backfillfullRatio,
+    fullRatio,
+  })
+
+  it('raises the ratios above a raised one', () => {
+    expect(linkRatios(ratios(0.92, 0.9, 0.95), 'nearfullRatio')).toEqual(ratios(0.92, 0.92, 0.95))
+    expect(linkRatios(ratios(0.97, 0.9, 0.95), 'nearfullRatio')).toEqual(ratios(0.97, 0.97, 0.97))
+    expect(linkRatios(ratios(0.85, 0.96, 0.95), 'backfillfullRatio')).toEqual(ratios(0.85, 0.96, 0.96))
+  })
+
+  it('lowers the ratios below a lowered one', () => {
+    expect(linkRatios(ratios(0.85, 0.9, 0.88), 'fullRatio')).toEqual(ratios(0.85, 0.88, 0.88))
+    expect(linkRatios(ratios(0.85, 0.8, 0.95), 'backfillfullRatio')).toEqual(ratios(0.8, 0.8, 0.95))
+  })
+
+  it('leaves ordered ratios alone', () => {
+    expect(linkRatios(ratios(0.8, 0.9, 0.95), 'nearfullRatio')).toEqual(ratios(0.8, 0.9, 0.95))
+    expect(linkRatios(ratios(0.85, 0.9, 0.99), 'fullRatio')).toEqual(ratios(0.85, 0.9, 0.99))
   })
 })

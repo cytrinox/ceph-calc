@@ -32,6 +32,8 @@ const props = withDefaults(
 )
 
 const model = defineModel<number>({ required: true })
+/** A finished change: leaving the field after typing, a −/+ button or arrow key, or the default link (not every key). */
+const emit = defineEmits<{ commit: [] }>()
 
 // The last word and the suffix wrap together, so a marker never ends up alone on a line.
 const labelHead = computed(() => props.label.slice(0, props.label.lastIndexOf(' ') + 1))
@@ -85,6 +87,12 @@ function onBlur(event: Event) {
   editing.value = false
   // Force the DOM back in sync even when the formatted text did not change.
   ;(event.target as HTMLInputElement).value = format(model.value)
+  emit('commit')
+}
+
+function resetToDefault() {
+  model.value = props.defaultValue!
+  emit('commit')
 }
 
 /** Arrow keys step like the − / + buttons (a text input has no native stepping). */
@@ -96,19 +104,19 @@ function onKeydown(event: KeyboardEvent) {
 }
 
 function stepBy(direction: 1 | -1) {
+  model.value = clamp(stepped(direction))
+  emit('commit')
+}
+
+function stepped(direction: 1 | -1): number {
   if (props.pow2) {
     const current = Math.max(1, Number(model.value) || 1)
     const exp = direction > 0 ? Math.floor(Math.log2(current)) + 1 : Math.ceil(Math.log2(current)) - 1
-    model.value = clamp(2 ** Math.max(0, exp))
-    return
+    return 2 ** Math.max(0, exp)
   }
   const current = Number(model.value) || 0
-  if (props.snap) {
-    model.value = clamp(snapStep(current, direction, props.step))
-    return
-  }
-  const next = Number((current + direction * props.step).toFixed(decimals.value))
-  model.value = clamp(next)
+  if (props.snap) return snapStep(current, direction, props.step)
+  return Number((current + direction * props.step).toFixed(decimals.value))
 }
 
 const isDefault = computed(() => props.defaultValue !== undefined && Math.abs(model.value - props.defaultValue) < 1e-9)
@@ -139,7 +147,7 @@ const atMax = computed(() => props.max !== undefined && model.value >= props.max
             type="button"
             class="reset"
             :title="`Reset ${label} to the default ${format(defaultValue)}`"
-            @click="model = defaultValue"
+            @click="resetToDefault"
           >default {{ format(defaultValue) }}</button><template v-else>default {{ format(defaultValue) }}</template>)
         </template>
       </span>

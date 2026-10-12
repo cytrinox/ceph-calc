@@ -11,7 +11,7 @@ import FaqLink from './FaqLink.vue'
 import { FAQ_IDS } from '@/lib/faq'
 import TabGroup from './TabGroup.vue'
 import ToggleField from './ToggleField.vue'
-import { DEFAULT_RATIOS, defaultEcMinSize, ratiosOrdered, schemeMinSize } from '@/lib/ceph'
+import { DEFAULT_RATIOS, defaultEcMinSize, linkRatios, ratiosOrdered, schemeMinSize, type FillRatios } from '@/lib/ceph'
 import { CUSTOM_EC, CUSTOM_REPLICATED, DEFAULT_PRESET_ID, PRESETS, schemeLabel, schemeSelection } from '@/lib/schemes'
 import { formatInt, formatIops } from '@/lib/format'
 import { IO_SIZES_KIB, MAX_OSD_IOPS, ioSizeLabel } from '@/lib/iops'
@@ -111,6 +111,12 @@ function applyExample(example: TopologyExample) {
   st.nearfullRatio = DEFAULT_RATIOS.nearfull
   st.backfillfullRatio = DEFAULT_RATIOS.backfillfull
   st.fullRatio = DEFAULT_RATIOS.full
+}
+
+// The ratios depend on each other: a finished change pushes the others along to keep nearfull ≤ backfillfull ≤ full.
+// (Not on every key: typing 0.97 passes through 0, which must not drag the others down.)
+function linkRatio(changed: keyof FillRatios) {
+  Object.assign(props.state, linkRatios(props.state, changed))
 }
 
 const domain = computed(() => props.state.failureDomain)
@@ -254,6 +260,7 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
         <div class="ratios">
           <NumberField
             v-model="state.nearfullRatio"
+            @commit="linkRatio('nearfullRatio')"
             label="Nearfull ratio"
             hint="Planning limit: get a warning when reaching nearfull"
             :default-value="DEFAULT_RATIOS.nearfull"
@@ -267,6 +274,7 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
           </NumberField>
           <NumberField
             v-model="state.backfillfullRatio"
+            @commit="linkRatio('backfillfullRatio')"
             label="Backfillfull ratio"
             hint="Recovery and backfill stop above this"
             :default-value="DEFAULT_RATIOS.backfillfull"
@@ -280,6 +288,7 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
           </NumberField>
           <NumberField
             v-model="state.fullRatio"
+            @commit="linkRatio('fullRatio')"
             label="Full ratio"
             hint="Hard limit: OSDs refuse writes above this"
             :default-value="DEFAULT_RATIOS.full"

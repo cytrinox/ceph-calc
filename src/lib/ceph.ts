@@ -22,9 +22,28 @@ export interface Tunables {
 /** Ceph defaults (mon_osd_*_ratio). */
 export const DEFAULT_RATIOS = { nearfull: 0.85, backfillfull: 0.9, full: 0.95 } as const
 
+export type FillRatios = Pick<Tunables, 'nearfullRatio' | 'backfillfullRatio' | 'fullRatio'>
+
 /** Ceph requires nearfull ≤ backfillfull ≤ full. */
-export function ratiosOrdered(t: Pick<Tunables, 'nearfullRatio' | 'backfillfullRatio' | 'fullRatio'>): boolean {
+export function ratiosOrdered(t: FillRatios): boolean {
   return t.nearfullRatio <= t.backfillfullRatio && t.backfillfullRatio <= t.fullRatio
+}
+
+const RATIO_ORDER = ['nearfullRatio', 'backfillfullRatio', 'fullRatio'] as const
+
+/**
+ * Keeps nearfull ≤ backfillfull ≤ full after `changed` was set: the ratios above it rise to its value when they are
+ * lower, the ones below it drop to its value when they are higher. Others stay as they are.
+ */
+export function linkRatios(t: FillRatios, changed: keyof FillRatios): FillRatios {
+  const linked = { nearfullRatio: t.nearfullRatio, backfillfullRatio: t.backfillfullRatio, fullRatio: t.fullRatio }
+  const at = RATIO_ORDER.indexOf(changed)
+  const value = linked[changed]
+  RATIO_ORDER.forEach((key, i) => {
+    if (i > at) linked[key] = Math.max(linked[key], value)
+    if (i < at) linked[key] = Math.min(linked[key], value)
+  })
+  return linked
 }
 
 const clampRatio = (r: number) => Math.min(1, Math.max(0, r || 0))
