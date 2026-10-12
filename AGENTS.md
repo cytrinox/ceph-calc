@@ -131,7 +131,9 @@ real net = placeable(domains − N largest) × nearfull × f
     Tentacle (v20) or later and that it cannot be switched off. Adopted pool options are a `SetupChange.pool`;
   - `pg_num` for pools that set their own (autoscaler off or warn) whenever it differs from `suggestPgNum()`. The
     details add when Ceph would warn (more than `PG_AUTOSCALE_THRESHOLD` = 3× off, warn mode) or refuse the pool
-    (more than `MAX_PG_PER_OSD` = 250 PG replicas per OSD).
+    (more than `MAX_PG_PER_OSD` = 250 PG replicas per OSD);
+  - `stripe_unit` 16K for EC pools with EC optimizations and a smaller one; the change row compares the OSD
+    operations at the client I/O size or 16K, whichever is larger.
 - **Severity:** `critical` (red warning sign before the headline) only when the current setup risks data loss, e.g.
   replication size 1; everything else is `info` (light bulb, the panel's colour).
 - **Collapsed by default:** each recommendation shows only its pictogram, headline, adopt button and chevron; the
@@ -275,7 +277,8 @@ IOPS    = min over the pool's classes c of N_eff,c / (reads / R_c + writes / W_c
 - **EC techniques:** `TECHNIQUES_BY_PLUGIN` lists only what each plugin accepts (clay: no `liberation` and no
   `blaum_roth`).
 - **`allow_ec_optimizations`:** emitted with a note (Tentacle or later, cannot be disabled). `poolIssues` flags
-  plugins/techniques other than jerasure or isa with `reed_sol_van`, and a `stripe_unit` below 16K.
+  plugins/techniques other than jerasure or isa with `reed_sol_van`. A `stripe_unit` below 16K is not an issue but
+  a recommendation (`stripeUnitRecommendation`, adoptable).
 
 ## Container, nginx and CI
 - **Image:** multi-stage `Containerfile`. The Node 22 build stage runs on the build platform and runs the tests; the

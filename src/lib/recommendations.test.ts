@@ -271,6 +271,39 @@ describe('EC optimizations recommendation', () => {
     expect(rec.adopt).toEqual({ summary: 'EC optimizations', setup: { pool: { ecOptimizations: true } } })
   })
 
+  it('recommends a 16K stripe_unit once EC optimizations are on', () => {
+    const rec = ecRecs(ec42, { ecOptimizations: true, stripeUnitKiB: 4 }).find((r) => r.id === 'stripe-unit')!
+    expect(find(ecRecs(ec42, { ecOptimizations: true, stripeUnitKiB: 4 }))).toBeUndefined()
+    expect(rec.title).toBe('Raise stripe_unit to 16K')
+    // a 4K request fits one strip either way; at 16K the shards differ: 4 (4K strips) vs 1
+    expect(rec.changes).toEqual([
+      {
+        parameter: 'stripe_unit (step 4)',
+        from: '4K',
+        // 4 strips of 4K: a whole stripe, written without reading
+        fromNote: '16K: read 4 OSD reads, write 6 OSD writes',
+        to: '16K',
+        toNote: '16K: read 1 OSD read, write 3 reads + 3 writes',
+      },
+    ])
+    expect(rec.details.join(' ')).toContain('with 4K a 16K request spreads over 4 shards, with 16K over 1 shard')
+    expect(rec.adopt).toEqual({ summary: 'stripe_unit 16K', setup: { pool: { stripeUnitKiB: 16 } } })
+    // not with 16K or more, without optimizations, or with an unsupported plugin
+    const ids = (pool: Partial<PoolOptions>) => ecRecs(ec42, pool).map((r) => r.id)
+    expect(ids({ ecOptimizations: true, stripeUnitKiB: 16 })).not.toContain('stripe-unit')
+    expect(ids({ ecOptimizations: false, stripeUnitKiB: 4 })).not.toContain('stripe-unit')
+    expect(ids({ ecOptimizations: true, stripeUnitKiB: 4, ecPlugin: 'clay' })).not.toContain('stripe-unit')
+  })
+
+  it('shows the IOPS of the stripe_unit change at the client I/O size', () => {
+    const input = hosts(8)
+    const pool = { ...defaultPoolOptions(), ecOptimizations: true, stripeUnitKiB: 4 }
+    const iops = iopsBasis([{ cls: 'ssd', osd: { read: 200, write: 200 }, largestOsdTB: 8 }], 512, 16)
+    const rec = recommendations({ input, result: computeCapacity(input, ec42, none), tunables: none, scheme: ec42, domain: 'host', pool, ioSizeKiB: 16, iops })
+      .find((r) => r.id === 'stripe-unit')!
+    expect(rec.changes[0].toNote).toMatch(/^16K: read 1 OSD read, write 3 reads \+ 3 writes; .* IOPS$/)
+  })
+
   it('is only for EC pools whose plugin supports it and that do not have it yet', () => {
     expect(find(ecRecs(rep3))).toBeUndefined()
     expect(find(ecRecs(ec42, { ecOptimizations: true, stripeUnitKiB: 16 }))).toBeUndefined()

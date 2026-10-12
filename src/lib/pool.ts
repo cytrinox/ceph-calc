@@ -232,10 +232,9 @@ export function poolIssues(pool: PoolOptions, scheme: Scheme): string[] {
       issues.push(`Technique ${pool.ecTechnique} requires m = 2.`)
     }
     if (pool.ecOptimizations) {
+      // A stripe_unit below 16K is a recommendation (recommendations.ts), not an issue.
       if (!EC_OPTIMIZATION_PLUGINS.includes(pool.ecPlugin) || pool.ecTechnique !== 'reed_sol_van') {
         issues.push('EC optimizations need the jerasure or isa plugin with reed_sol_van.')
-      } else if (pool.stripeUnitKiB < 16) {
-        issues.push('With EC optimizations Ceph recommends a stripe_unit of at least 16K.')
       }
     }
   }

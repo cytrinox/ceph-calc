@@ -6,7 +6,7 @@
 import { computeCapacity, schemeWidth, type CapacityInput, type CapacityResult, type Scheme, type Tunables } from './ceph'
 import { CRUSH_WEIGHT_MAX, initialWeightFor, type CrushWeightOverflow } from './crushTree'
 import { formatInt, formatIops, formatPct } from './format'
-import { describeCost, estimateIops, ioSizeLabel, opCosts, type IopsBasis, type OpCosts } from './iops'
+import { describeCost, estimateIops, ioSizeLabel, opCosts, type IopsBasis } from './iops'
 import {
   DEFAULT_PG_TARGET_PER_OSD,
   DEFAULT_POOL_PG_NUM,
@@ -420,6 +420,19 @@ export function crushWeightRecommendation({ crushOverflow }: RecommendationInput
   }
 }
 
+/**
+ * OSD operations per client read and write of `size` ("16K: read 1 OSD read, write 3 reads + 3 writes"), plus the
+ * IOPS they allow when per-OSD IOPS are set for that size (the client I/O size of step 5).
+ */
+function ecEffect(scheme: Scheme, options: PoolOptions, size: number, iops: IopsBasis | null | undefined): string {
+  const costs = opCosts(scheme, options, size)
+  const ops = `${ioSizeLabel(size)}: read ${describeCost(costs.read)}, write ${describeCost(costs.write)}`
+  const estimate = iops && iops.ioSizeKiB === size ? estimateIops(iops, scheme, options) : null
+  return estimate && estimate.read !== null && estimate.write !== null
+    ? `${ops}; ${formatIops(estimate.read)} / ${formatIops(estimate.write)} IOPS`
+    : ops
+}
+
 /** Ceph's recommended minimum stripe_unit with EC optimizations, in KiB. */
 const EC_OPTIMIZED_STRIPE_UNIT_KIB = 16
 
@@ -440,21 +453,13 @@ export function ecOptimizationsRecommendation({
   const stripeUnitKiB = Math.max(pool.stripeUnitKiB, EC_OPTIMIZED_STRIPE_UNIT_KIB)
   const raiseStripeUnit = stripeUnitKiB !== pool.stripeUnitKiB
   const optimized = { ...pool, ecOptimizations: true, stripeUnitKiB }
-  // OSD operations per client read and write, and the IOPS they allow when per-OSD IOPS are set.
-  const effect = (options: PoolOptions, costs: OpCosts) => {
-    const ops = `${ioSizeLabel(size)}: read ${describeCost(costs.read)}, write ${describeCost(costs.write)}`
-    const estimate = iops ? estimateIops(iops, scheme, options) : null
-    return estimate && estimate.read !== null && estimate.write !== null
-      ? `${ops}; ${formatIops(estimate.read)} / ${formatIops(estimate.write)} IOPS`
-      : ops
-  }
   const changes: SettingChange[] = [
     {
       parameter: 'allow_ec_optimizations (step 4)',
       from: 'false',
-      fromNote: effect(pool, opCosts(scheme, pool, size)),
+      fromNote: ecEffect(scheme, pool, size, iops),
       to: 'true',
-      toNote: effect(optimized, opCosts(scheme, optimized, size)),
+      toNote: ecEffect(scheme, optimized, size, iops),
     },
   ]
   if (raiseStripeUnit) {
@@ -502,6 +507,51 @@ export function ecOptimizationsRecommendation({
  * pg_num as Ceph's autoscaler would pick it, when the pool sets its own (autoscaler off or warn) and it differs:
  * the PG target per OSD (step 5) × OSDs ÷ pool width, as the nearest power of two.
  */
+/**
+ * stripe_unit of at least 16K for an EC pool with EC optimizations (Ceph's recommendation): requests then touch fewer
+ * data shards. The counterpart of `ecOptimizationsRecommendation`, which raises it when enabling them.
+ */
+export function stripeUnitRecommendation({
+  scheme,
+  pool,
+  ioSizeKiB,
+  iops,
+}: RecommendationInput): Recommendation | null {
+  if (scheme.kind !== 'ec' || !pool?.ecOptimizations || pool.stripeUnitKiB >= EC_OPTIMIZED_STRIPE_UNIT_KIB) return null
+  // Without a supported plugin and technique the optimizations don't work at all (a pool issue says so).
+  if (!EC_OPTIMIZATION_PLUGINS.includes(pool.ecPlugin) || pool.ecTechnique !== 'reed_sol_van') return null
+  const to = EC_OPTIMIZED_STRIPE_UNIT_KIB
+  const raised = { ...pool, stripeUnitKiB: to }
+  // A request no larger than one strip touches one shard either way: compare at least 16K.
+  const size = Math.max(ioSizeKiB ?? iops?.ioSizeKiB ?? 4, to)
+  const shards = (unit: number) => Math.min(scheme.k, Math.ceil(size / unit))
+  const shardWord = (n: number) => `${n} ${n === 1 ? 'shard' : 'shards'}`
+  return {
+    id: 'stripe-unit',
+    severity: 'info',
+    title: `Raise stripe_unit to ${ioSizeLabel(to)}`,
+    changes: [
+      {
+        parameter: 'stripe_unit (step 4)',
+        from: ioSizeLabel(pool.stripeUnitKiB),
+        fromNote: ecEffect(scheme, pool, size, iops),
+        to: ioSizeLabel(to),
+        toNote: ecEffect(scheme, raised, size, iops),
+      },
+    ],
+    details: [
+      'With EC optimizations a request reads and writes only the data shards it touches. stripe_unit is how much ' +
+        `data goes to one shard before the next: with ${ioSizeLabel(pool.stripeUnitKiB)} a ${ioSizeLabel(size)} ` +
+        `request spreads over ${shardWord(shards(pool.stripeUnitKiB))}, with ${ioSizeLabel(to)} over ` +
+        `${shardWord(shards(to))}. Reads of medium-sized requests then need fewer OSD operations; writes compare ` +
+        'in the row above (a write covering a whole stripe needs no reads, so small strips can help writes).',
+      `Ceph recommends a stripe_unit of at least ${ioSizeLabel(to)} with EC optimizations. stripe_unit is part of ` +
+        'the EC profile, so it is set when the pool is created.',
+    ],
+    adopt: { summary: `stripe_unit ${ioSizeLabel(to)}`, setup: { pool: { stripeUnitKiB: to } } },
+  }
+}
+
 export function pgNumRecommendation({
   scheme,
   pool,
@@ -577,6 +627,7 @@ export function recommendations(input: RecommendationInput): Recommendation[] {
     recoveryReserveRecommendation(input),
     nearfullRecommendation(input),
     ecOptimizationsRecommendation(input),
+    stripeUnitRecommendation(input),
     pgNumRecommendation(input),
   ].filter((r): r is Recommendation => r !== null)
 }

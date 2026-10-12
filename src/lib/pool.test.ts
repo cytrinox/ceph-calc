@@ -88,16 +88,15 @@ describe('pool options', () => {
     expect(poolIssues({ ...base, ecPlugin: 'clay', ecTechnique: 'liber8tion' }, ec42)).toEqual([])
   })
 
-  it('checks EC optimizations against plugin, technique and stripe_unit', () => {
+  it('checks EC optimizations against plugin and technique', () => {
     const opt = { ...defaultPoolOptions(), ecOptimizations: true, stripeUnitKiB: 16 }
     expect(poolIssues(opt, ec42)).toEqual([])
     expect(poolIssues({ ...opt, ecPlugin: 'isa' }, ec42)).toEqual([])
     const unsupported = 'EC optimizations need the jerasure or isa plugin with reed_sol_van.'
     expect(poolIssues({ ...opt, ecPlugin: 'clay' }, ec42)).toEqual([unsupported])
     expect(poolIssues({ ...opt, ecTechnique: 'cauchy_good' }, ec42)).toEqual([unsupported])
-    expect(poolIssues({ ...opt, stripeUnitKiB: 4 }, ec42)).toEqual([
-      'With EC optimizations Ceph recommends a stripe_unit of at least 16K.',
-    ])
+    // a small stripe_unit is a recommendation, not an issue
+    expect(poolIssues({ ...opt, stripeUnitKiB: 4 }, ec42)).toEqual([])
     // replicated pools ignore EC settings
     expect(poolIssues({ ...opt, ecPlugin: 'clay' }, rep3)).toEqual([])
   })
