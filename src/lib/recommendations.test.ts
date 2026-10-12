@@ -1,7 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { computeCapacity, DEFAULT_RATIOS, type CapacityInput, type Scheme, type Tunables } from './ceph'
+import { crushWeightOverflow } from './crushTree'
 import { isApplicable, recommendations } from './recommendations'
-import { buildBasicTopology, failureDomains, TOPOLOGY_EXAMPLES, type DomainType } from './topology'
+import { buildBasicTopology, buildExampleTopology, failureDomains, newBucket, newOsdGroup, TOPOLOGY_EXAMPLES, type DomainType } from './topology'
 
 const rep3: Scheme = { kind: 'replicated', size: 3, minSize: 2 }
 const ratios = { fullRatio: DEFAULT_RATIOS.full, backfillfullRatio: DEFAULT_RATIOS.backfillfull, nearfullRatio: DEFAULT_RATIOS.nearfull }
@@ -175,3 +176,39 @@ describe('failure-domain recommendation', () => {
     expect(ids(recs(hosts(5), rep3, none))).not.toContain('failure-domain')
   })
 })
+
+describe('CRUSH weight recommendation', () => {
+  const none = { ...ratios, recoveryReserve: 0 }
+  const withOverflow = (topology: ReturnType<typeof buildExampleTopology>) => {
+    const input = failureDomains(topology, 'host')
+    const result = computeCapacity(input, rep3, none)
+    return recommendations({ input, result, tunables: none, scheme: rep3, domain: 'host', crushOverflow: crushWeightOverflow(topology) })
+  }
+
+  it('recommends osd_crush_initial_weight = 1 when a bucket would overflow', () => {
+    const rec = withOverflow(buildExampleTopology()).find((r) => r.id === 'crush-initial-weight')!
+    expect(rec.title).toBe('Set osd_crush_initial_weight to 1')
+    expect(rec.severity).toBe('info')
+    expect(rec.config).toEqual([{ option: 'osd_crush_initial_weight', value: '1' }])
+    expect(rec.changes).toMatchObject([{ parameter: 'osd_crush_initial_weight', from: '-1', to: '1' }])
+    expect(rec.changes[0].fromNote).toContain('582,076 TiB, above the 65,536 TiB limit')
+    expect(rec.changes[0].toNote).toBe('every OSD weighs 1; root 40,000')
+    expect(rec.details.join(' ')).toContain('ceph osd crush reweight-subtree default 1')
+    expect(rec.details.join(' ')).not.toContain('differ in size')
+    expect(isApplicable(rec)).toBe(true)
+  })
+
+  it('warns that equal weights ignore different OSD sizes', () => {
+    const topology = [
+      newBucket('host', 'big', { count: 4000, osds: [newOsdGroup(1, 16)] }),
+      newBucket('host', 'small', { count: 4000, osds: [newOsdGroup(1, 8)] }),
+    ]
+    const rec = withOverflow(topology).find((r) => r.id === 'crush-initial-weight')!
+    expect(rec.details.join(' ')).toContain('Your OSDs differ in size (8 to 16 TB)')
+  })
+
+  it('is not needed while the weights fit', () => {
+    expect(ids(withOverflow(buildBasicTopology({ hosts: 5, osdsPerHost: 8, osdSizeTB: 8 })))).not.toContain('crush-initial-weight')
+  })
+})
+

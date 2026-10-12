@@ -4,7 +4,8 @@
 // Add new kinds to `recommendations()`.
 
 import { computeCapacity, type CapacityInput, type CapacityResult, type Scheme, type Tunables } from './ceph'
-import { formatPct } from './format'
+import { CRUSH_WEIGHT_MAX, initialWeightFor, type CrushWeightOverflow } from './crushTree'
+import { formatInt, formatPct } from './format'
 import { PRESETS } from './schemes'
 import { plural, type DomainType } from './topology'
 import { formatCapacity } from './units'
@@ -26,6 +27,8 @@ export interface RecommendationInput {
   domain: DomainType
   /** The same topology with hosts as failure domains; only needed while spreading across OSDs. */
   hostInput?: CapacityInput
+  /** Set when CRUSH can't hold the hardware with its default weights (see `crushWeightOverflow`). */
+  crushOverflow?: CrushWeightOverflow | null
 }
 
 export type MarkerKind = 'nearfull' | 'backfillfull' | 'full' | 'recommended'
@@ -342,11 +345,62 @@ export function failureDomainRecommendation({
   }
 }
 
+/** Fixed-point CRUSH weight as TiB, e.g. for "582,076 TiB". */
+const tib = (fixed: number) => `${formatInt(Math.round(fixed / 0x10000))} TiB`
+
+/**
+ * osd_crush_initial_weight = 1 when the default weights (TiB) overflow a CRUSH bucket: CRUSH only compares weights,
+ * so the same weight for every OSD keeps the placement while the root weighs the OSD count. Smaller than 1 only
+ * beyond 65,535 OSDs.
+ */
+export function crushWeightRecommendation({ crushOverflow }: RecommendationInput): Recommendation | null {
+  if (!crushOverflow) return null
+  const { rootWeight, osds, smallestTB, largestTB } = crushOverflow
+  const value = initialWeightFor(osds)
+  const limit = tib(CRUSH_WEIGHT_MAX + 1)
+  const details = [
+    `CRUSH stores a bucket's weight as a 32-bit fixed-point number, so no bucket can weigh more than ${limit}. ` +
+      `With Ceph's default weights, each OSD's size in TiB, root default would weigh ${tib(rootWeight)}. Ceph ` +
+      `refuses OSDs once a bucket overflows ("insert_item unable to rebuild roots with classes: (34) Numerical ` +
+      `result out of range"), and those OSDs never get data.`,
+    `CRUSH only compares weights, so giving every OSD the same weight keeps the placement. With ` +
+      `osd_crush_initial_weight = ${value}, each new OSD weighs ${value} instead of its size, and the root ` +
+      `${formatInt(Number(value) * osds)}.`,
+    'Set it before the OSDs are created. An existing cluster can be reweighted with ' +
+      `ceph osd crush reweight-subtree default ${value}.`,
+  ]
+  if (largestTB > smallestTB) {
+    details.push(
+      `Your OSDs differ in size (${smallestTB} to ${largestTB} TB). With the same weight each gets the same share ` +
+        'of data, so the smaller ones fill up first. Give each OSD a weight in proportion to its size instead, e.g. ' +
+        'its TiB ÷ 10, with ceph osd crush reweight osd.N <weight>.',
+    )
+  }
+  return {
+    id: 'crush-initial-weight',
+    severity: 'info',
+    title: `Set osd_crush_initial_weight to ${value}`,
+    changes: [
+      {
+        parameter: 'osd_crush_initial_weight',
+        from: '-1',
+        fromNote: `Ceph default: the size in TiB; root ${tib(rootWeight)}, above the ${limit} limit`,
+        to: value,
+        toNote: `every OSD weighs ${value}; root ${formatInt(Number(value) * osds)}`,
+      },
+    ],
+    details,
+    toggleLabel: `osd_crush_initial_weight ${value}`,
+    config: [{ option: 'osd_crush_initial_weight', value }],
+  }
+}
+
 export function recommendations(input: RecommendationInput): Recommendation[] {
   return [
     replicationRecommendation(input),
     failureDomainRecommendation(input),
     singleCopyRecommendation(input),
+    crushWeightRecommendation(input),
     recoveryReserveRecommendation(input),
     nearfullRecommendation(input),
   ].filter((r): r is Recommendation => r !== null)

@@ -52,6 +52,8 @@ export interface AppState {
   osdWriteIops: number
   /** Client I/O size of the IOPS estimate, in KiB. */
   ioSizeKiB: number
+  /** Show the virtual CRUSH map (`ceph osd crush tree`) of the hardware. */
+  crushMap: boolean
 }
 
 export function defaultState(): AppState {
@@ -71,6 +73,7 @@ export function defaultState(): AppState {
     osdReadIops: 0,
     osdWriteIops: 0,
     ioSizeKiB: DEFAULT_IO_SIZE_KIB,
+    crushMap: false,
   }
 }
 
@@ -96,6 +99,8 @@ interface Packed {
   cu?: string
   /** Read and write IOPS per OSD and the I/O size in KiB; left out when not set. */
   io?: [number, number, number]
+  /** 1 = show the virtual CRUSH map; left out when off. */
+  cm?: 1
 }
 
 const iops = (value: unknown) => Math.min(MAX_OSD_IOPS, int(value))
@@ -245,6 +250,7 @@ export function encodeState(state: AppState): string {
     ...(state.osdReadIops > 0 || state.osdWriteIops > 0 || state.ioSizeKiB !== DEFAULT_IO_SIZE_KIB
       ? { io: [iops(state.osdReadIops), iops(state.osdWriteIops), ioSize(state.ioSizeKiB)] as [number, number, number] }
       : {}),
+    ...(state.crushMap ? { cm: 1 as const } : {}),
   }
   if (state.advanced) packed.a = state.advanced.map(packBucket)
   return toBase64Url(JSON.stringify(packed))
@@ -281,6 +287,7 @@ export function decodeState(data: string): AppState | null {
       state.osdWriteIops = iops(p.io[1])
       state.ioSizeKiB = ioSize(p.io[2])
     }
+    state.crushMap = p.cm === 1
     return state
   } catch {
     return null

@@ -3,6 +3,7 @@ import { computed, reactive, watch } from 'vue'
 import CapacitySummary from './components/CapacitySummary.vue'
 import CommandsPanel from './components/CommandsPanel.vue'
 import ConfigPanel from './components/ConfigPanel.vue'
+import CrushTreePanel from './components/CrushTreePanel.vue'
 import FaqPanel from './components/FaqPanel.vue'
 import RecommendationsPanel from './components/RecommendationsPanel.vue'
 import SchemeTable from './components/SchemeTable.vue'
@@ -10,6 +11,7 @@ import ShareButton from './components/ShareButton.vue'
 import ThemeToggle from './components/ThemeToggle.vue'
 import UnitToggle from './components/UnitToggle.vue'
 import { computeCapacity, emptyDomainsWarning, placementMessage, ratiosOrdered, schemeMinSize, type Scheme } from './lib/ceph'
+import { CRUSH_WEIGHT_MAX, crushWeightOverflow } from './lib/crushTree'
 import { formatInt, formatPct, formatTB } from './lib/format'
 import { formatCapacity } from './lib/units'
 import { clusterPrice, formatPrice, pricePerUsableTB } from './lib/pricing'
@@ -65,6 +67,11 @@ const topology = computed(() =>
 )
 
 const stats = computed(() => topologyStats(topology.value))
+
+// The hardware as Ceph would list it: Basic OSDs get the rule's device class, as when they seed the Advanced tab.
+const crushTopology = computed(() => (state.tab === 'basic' ? seedFromBasic() : topology.value))
+// Set when a CRUSH bucket would exceed its weight limit with Ceph's default weights (TiB).
+const crushOverflow = computed(() => crushWeightOverflow(crushTopology.value))
 
 // A CRUSH rule restricted to a device class only uses those OSDs (Advanced tab; Basic OSDs always match).
 const ruleClass = computed(() => (state.tab === 'advanced' ? state.pool.deviceClass : ''))
@@ -194,6 +201,16 @@ const warnings = computed(() => {
   } else if (state.tab === 'advanced' && stats.value.emptyBuckets > 0) {
     list.push('Some buckets contain no OSDs.')
   }
+  if (crushOverflow.value) {
+    const { rootWeight, buckets } = crushOverflow.value
+    const tib = (fixed: number) => `${formatInt(Math.round(fixed / 0x10000))} TiB`
+    const others = buckets.map((b) => `${formatInt(b.count)} ${plural(b.type, b.count)}`).join(', ')
+    list.push(
+      `CRUSH weights overflow: with Ceph's default weights (TiB), root default would weigh ${tib(rootWeight)}` +
+        `${others ? ` (${others} too)` : ''}, but a CRUSH bucket weighs at most ${tib(CRUSH_WEIGHT_MAX + 1)}. Ceph ` +
+        `refuses further OSDs once a bucket overflows; see the recommendation for osd_crush_initial_weight.`,
+    )
+  }
   if (!ratiosOrdered(tunables.value)) {
     list.push('Ratios out of order: Ceph requires nearfull ≤ backfillfull ≤ full.')
   }
@@ -215,6 +232,7 @@ const recommendationList = computed(() =>
     domain: state.failureDomain,
     // While spreading across OSDs: the same topology spread across hosts, for the failure-domain recommendation.
     hostInput: state.failureDomain === 'osd' ? failureDomains(poolTopology.value, 'host') : undefined,
+    crushOverflow: crushOverflow.value,
   }),
 )
 
@@ -328,6 +346,7 @@ watch(
           :pool="state.pool"
           @select="selectScheme"
         />
+        <CrushTreePanel v-if="state.crushMap" :topology="crushTopology" />
         <RecommendationsPanel :recommendations="recommendationList" :result="result" @adopt="adoptRecommendation" />
         <CommandsPanel
           :pool="state.pool"

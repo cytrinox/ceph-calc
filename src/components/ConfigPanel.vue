@@ -10,6 +10,7 @@ import StepSection from './StepSection.vue'
 import FaqLink from './FaqLink.vue'
 import { FAQ_IDS } from '@/lib/faq'
 import TabGroup from './TabGroup.vue'
+import ToggleField from './ToggleField.vue'
 import { DEFAULT_RATIOS, defaultEcMinSize, ratiosOrdered, schemeMinSize } from '@/lib/ceph'
 import { CUSTOM_EC, CUSTOM_REPLICATED, DEFAULT_PRESET_ID, PRESETS, schemeLabel, schemeSelection } from '@/lib/schemes'
 import { formatInt, formatIops } from '@/lib/format'
@@ -140,7 +141,7 @@ const miscSummary = computed(() => {
   const price = st.pricePerTB > 0 ? `${formatPrice(st.pricePerTB, st.currency)}/TB` : 'no price'
   const iops =
     r > 0 || w > 0 ? `${ioSizeLabel(st.ioSizeKiB)} · read ${value(r)} · write ${value(w)} IOPS per OSD` : 'no IOPS'
-  return `${price} · ${iops}`
+  return [price, iops, ...(st.crushMap ? ['CRUSH map'] : [])].join(' · ')
 })
 
 /** Failure domains beyond what one object needs: the most the recovery reserve can cover. */
@@ -307,7 +308,7 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
       />
     </StepSection>
 
-    <StepSection :num="5" collapsed-by-default title="Miscellaneous" subtitle="Optional: drive price and IOPS for cost and performance estimates" :summary="miscSummary">
+    <StepSection :num="5" collapsed-by-default title="Miscellaneous" subtitle="Optional: drive price, IOPS and a virtual CRUSH map" :summary="miscSummary">
       <div class="misc-group">
         <h4>Price</h4>
         <NumberField
@@ -373,6 +374,15 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
           <code>ceph tell osd.N bench</code> for writes), so BlueStore overhead is included. Leave both empty to hide the
           estimate.
         </p>
+      </div>
+
+      <div class="misc-group">
+        <h4>CRUSH map</h4>
+        <ToggleField
+          v-model="state.crushMap"
+          label="Create virtual CRUSH map"
+          hint="Shows how ceph osd crush tree would list this configuration."
+        />
       </div>
     </StepSection>
   </section>

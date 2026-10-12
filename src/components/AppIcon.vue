@@ -27,6 +27,7 @@ export type IconName =
   | 'scale'
   | 'bulb'
   | 'arrow-right'
+  | 'hierarchy'
 
 defineProps<{ name: IconName; size?: number }>()
 
@@ -57,6 +58,7 @@ const PATHS: Record<IconName, string> = {
   share: 'M10 14a5 5 0 0 0 7.07 0l3-3a5 5 0 0 0-7.07-7.07l-1.5 1.5M14 10a5 5 0 0 0-7.07 0l-3 3a5 5 0 0 0 7.07 7.07l1.5-1.5',
   alert: 'M12 9v4m0 4h.01M10.3 3.9 2.4 18a2 2 0 0 0 1.7 3h15.8a2 2 0 0 0 1.7-3L13.7 3.9a2 2 0 0 0-3.4 0z',
   'arrow-right': 'M5 12h14m-6-6 6 6-6 6',
+  hierarchy: 'M9 3h6v5H9zM12 8v4M5 16v-4h14v4M3 16h4v5H3zM10 16h4v5h-4zM17 16h4v5h-4zM12 12v4',
   bulb: 'M9 18h6M10 21h4M12 3a6 6 0 0 0-3.6 10.8c.8.6 1.1 1.4 1.1 2.2h5c0-.8.3-1.6 1.1-2.2A6 6 0 0 0 12 3z',
   scale: 'M12 4v16M8 20h8M5 7h14M5 7l-2.5 7M5 7l2.5 7M2.5 14a2.5 2.5 0 0 0 5 0zM19 7l-2.5 7M19 7l2.5 7M16.5 14a2.5 2.5 0 0 0 5 0z',
 }

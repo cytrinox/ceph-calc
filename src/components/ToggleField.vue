@@ -47,6 +47,8 @@ code {
   font-size: 0.72rem;
   color: var(--text-faint);
   margin-left: 0.25rem;
+  // Options like --show-shadow wrap as a whole, not at their hyphens.
+  white-space: nowrap;
 }
 
 .hint {

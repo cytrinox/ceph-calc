@@ -201,6 +201,15 @@ describe('topology', () => {
     expect(decodeState(encodeState(state))!.ioSizeKiB).toBe(4)
   })
 
+  it('stores the virtual CRUSH map switch in shared links only when on', () => {
+    const state = defaultState()
+    const packed = (st: typeof state) => JSON.parse(Buffer.from(encodeState(st), 'base64url').toString())
+    expect(packed(state).cm).toBeUndefined()
+    state.crushMap = true
+    expect(packed(state).cm).toBe(1)
+    expect(decodeState(encodeState(state))!.crushMap).toBe(true)
+  })
+
   it('raises k = 1 from a shared link to the Ceph minimum of 2', () => {
     const state = defaultState()
     state.scheme = { kind: 'ec', k: 1, m: 1 }

@@ -44,6 +44,7 @@ src/
     pricing.ts            price per TB, cost per usable TB, formatPrice, CURRENCY_MAX_LENGTH
     recommendations.ts    recommendations from the result (nearfull ratio for the recovery reserve), applied as overrides
     iops.ts               IOPS estimate: OSD ops per client op (opCosts), capacity-weighted OSD count, ceiling
+    crushTree.ts          virtual `ceph osd crush tree` output of the topology (step 5 "Create virtual CRUSH map")
     faq.ts                FAQ anchor ids + openFaq()
   styles/                 _tokens.scss (breakpoints, fonts, mixins), _themes.scss (colour tokens), main.scss
 ```
@@ -106,6 +107,10 @@ real net = placeable(domains − N largest) × nearfull × f
   That is the healthy fill at the planned data, so Ceph warns when the plan is exceeded while a failure is still
   recoverable below the planning nearfull. An applied override is emitted even without the other cluster-wide ratios.
   Not offered when the layout tolerates no failure (size 1): nothing can be recovered.
+- **CRUSH weight limit:** `crushWeightOverflow()` (crushTree.ts) reports when a bucket would exceed `CRUSH_WEIGHT_MAX`
+  (`__u32` 16.16 fixed point, 65,536 TiB) with Ceph's default weights; `App.vue` adds a warning, and the applied
+  recommendation sets `osd_crush_initial_weight` to 1 (smaller beyond 65,535 OSDs, `initialWeightFor`), with a caveat
+  for mixed OSD sizes. Checked whether or not the CRUSH map panel is shown.
 - **Single-copy pools (replication size 1):** `mon_allow_pool_size_one true` is required and always in the commands;
   the recommendation adds `mon_warn_on_pool_no_redundancy false` against the permanent `HEALTH_WARN`.
 - **Distribution bar:** `DistributionBar.vue` draws the raw data distribution with its ratio markers. The result card
@@ -147,6 +152,26 @@ IOPS  = N_eff / (reads / R + writes / W)   (R, W = per-OSD read / write IOPS at 
   operation needs but that is 0 shows "—".
 - **Scope:** a healthy-cluster ceiling only. Keep it that way unless the model is extended deliberately (network,
   CPU, latency and recovery are out of scope).
+
+## Virtual CRUSH map (`src/lib/crushTree.ts`)
+
+- **What:** the text `ceph osd crush tree [--show-shadow]` would print once the hardware is deployed, shown in its own
+  panel when step 5's "Create virtual CRUSH map" is on (`crushMap`, link key `cm`). "Include shadow trees" is a local
+  view option.
+- **Format** (Ceph's TextTable): columns ID / CLASS / WEIGHT right-aligned under left-aligned headings, two spaces
+  apart; TYPE NAME indented 4 spaces per level; OSDs print only their name. Tests pin the exact text.
+- **IDs:** buckets in tree order, each followed by its shadow buckets (root default -1, default~hdd -2, first host
+  -3, …), OSDs from 0. Roots print in ascending ID order, so the shadow trees come first.
+- **Weights** (checked against Ceph's source, bit-exact): the OSD registers `"%.4lf"` of max(0.00001, bytes ÷ 2^40)
+  (`OSD::update_crush_location`), CRUSH stores `(int)(weight * (float)0x10000)` (`osdCrushWeight`), buckets sum
+  their items, and `weightf_t` prints the single-precision value with 5 decimals, 0 as "0" (`formatCrushWeight`).
+  `printfFixed` rounds like glibc (exact value, ties to even), not like `toFixed`. The panel shows the formula. Shadow
+  trees contain every bucket, with only their class's OSDs.
+- **Names:** `×N` copies get the next free name (host01 → host02), like splitting, through a per-prefix cursor so
+  huge trees stay fast. The Basic tab's OSDs get the rule's class (as when seeding the Advanced tab).
+- **Size:** weights and row counts come from the compact tree; each tree renders at most
+  `CRUSH_TREE_ROWS_PER_ROOT` (500) rows and counts the rest ("… N more"). "Copy" generates the complete output on
+  click (`rowsPerRoot = Infinity`) and asks first above 250,000 lines (`crushTreeRowCount`, without expanding).
 
 ## Conventions
 
@@ -193,7 +218,7 @@ IOPS  = N_eff / (reads / R + writes / W)   (R, W = per-OSD read / write IOPS at 
 
 ### State, links and storage
 - **Shared links:** the whole configuration lives in the URL hash as base64url JSON (`#s=…`). Short keys are listed in
-  `urlState.ts`: `v t b a d s f bf nf r p pt cu io`. OSD groups in the tree pack as `[count, sizeTB]`, plus the
+  `urlState.ts`: `v t b a d s f bf nf r p pt cu io cm`. OSD groups in the tree pack as `[count, sizeTB]`, plus the
   device class when it isn't ssd (`[8, 16, 'hdd']`).
   - Clamp and validate on **both** encode and decode.
   - Share limits through constants, e.g. `CURRENCY_MAX_LENGTH`.
