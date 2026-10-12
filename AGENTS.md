@@ -235,6 +235,8 @@ IOPS    = min over the pool's classes c of N_eff,c / (reads / R_c + writes / W_c
   - Clamp and validate on **both** encode and decode.
   - Share limits through constants, e.g. `CURRENCY_MAX_LENGTH`.
 - **FAQ links** use `openFaq()`, not `#fragment` links, because the hash holds the configuration.
+- **Reset** (Cluster setup header) assigns `defaultState()`; it is disabled while the state already encodes like the
+  defaults. The hash is replaced, not pushed, so there is no undo: it asks first.
 - **Per-viewer preferences** live in `localStorage`: `ceph-calculator-theme`, `ceph-calculator-unit` and
   `ceph-calculator-step-N` (collapsed steps; steps 2–5 start collapsed). Always wrap `localStorage` access in
   `try/catch`.

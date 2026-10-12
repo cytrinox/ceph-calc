@@ -17,7 +17,7 @@ import { formatInt, formatIops } from '@/lib/format'
 import { IO_SIZES_KIB, MAX_OSD_IOPS, ioSizeLabel, type OsdIops } from '@/lib/iops'
 import { CURRENCY_MAX_LENGTH, formatPrice } from '@/lib/pricing'
 import { DEFAULT_OSD_CLASS, TYPE_ID, plural, type DomainType, type TopologyExample } from '@/lib/topology'
-import type { AppState, TopologyTab } from '@/lib/urlState'
+import { defaultState, encodeState, type AppState, type TopologyTab } from '@/lib/urlState'
 
 const props = defineProps<{
   state: AppState
@@ -34,7 +34,17 @@ const props = defineProps<{
   /** Copies / shards per object. */
   width: number
 }>()
-const emit = defineEmits<{ resetFromBasic: [] }>()
+const emit = defineEmits<{ resetFromBasic: []; reset: [] }>()
+
+// Everything back to the first-visit defaults. The configuration lives only in the URL (replaced, not pushed), so
+// there is no undo: ask first. Viewer preferences (theme, unit, open steps) stay.
+const isDefault = computed(() => encodeState(props.state) === encodeState(defaultState()))
+function reset() {
+  const question =
+    'Reset the cluster setup to the defaults? This replaces the hardware (including the Advanced tree), ' +
+    'redundancy, headroom and pool settings, the price, the IOPS and the CRUSH map switch.'
+  if (confirm(question)) emit('reset')
+}
 
 const tabs: { value: TopologyTab; label: string; hint: string }[] = [
   { value: 'basic', label: 'Basic', hint: 'identical hosts' },
@@ -197,6 +207,18 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
     <div class="card-head">
       <span class="icon-badge"><AppIcon name="server" :size="17" /></span>
       <h2>Cluster setup</h2>
+      <div class="aside">
+        <button
+          type="button"
+          class="btn"
+          :disabled="isDefault"
+          :title="isDefault ? 'All settings are at their defaults' : 'Reset all settings to the defaults'"
+          aria-label="Reset all settings to the defaults"
+          @click="reset"
+        >
+          <AppIcon name="reset" :size="15" />
+        </button>
+      </div>
     </div>
 
     <StepSection :num="1" title="Hardware" subtitle="Hosts and drives that make up the cluster" :summary="hardwareSummary">
@@ -443,6 +465,35 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
 <style lang="scss" scoped>
 .config {
   padding-bottom: 0.4rem;
+}
+
+// Round icon button, like the buttons in the other card heads (Copy all, Copy).
+.btn {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--panel-alt);
+  color: var(--text);
+  padding: 0;
+  cursor: pointer;
+
+  &:hover:not(:disabled) {
+    border-color: var(--accent);
+    color: var(--accent-text);
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: default;
+  }
+
+  @include touch {
+    width: 44px;
+    height: 44px;
+  }
 }
 
 // Basic / Advanced (step 1); the IOPS class tabs sit in a grid with its own gaps.

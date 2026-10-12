@@ -65,7 +65,8 @@ Source: <https://github.com/cytrinox/ceph-calc>
   protection flags), with copy-all, per-section copy and download as a shell script. EC pools only get a
   `min_size` command when it differs from the default Ceph sets on creation.
 - Light/dark theme, responsive single-column layout on phones, and configuration stored in the URL hash;
-  the **Share** button copies that link (or opens the native share sheet on phones).
+  the **Share** button copies that link (or opens the native share sheet on phones). The reset button in the Cluster setup
+  panel brings every setting back to its default (after asking; theme, unit and open steps stay).
 - Link previews (Open Graph / X card) with a screenshot of the calculator.
 - **TB / TiB** switch for all results (bar, tables, chart, warnings). Inputs such as OSD sizes stay in decimal TB,
   as drives are sold that way; TiB matches what `ceph df` reports.

@@ -62,6 +62,11 @@ function resetFromBasic() {
   state.advanced = seedFromBasic()
 }
 
+// "Reset" in the Cluster setup panel: the first-visit defaults (the panel asks first).
+function resetAll() {
+  Object.assign(state, defaultState())
+}
+
 // Basic OSDs get the rule's device class (ssd for any), as when they seed the Advanced tab: they always match it.
 const topology = computed(() => (state.tab === 'basic' ? seedFromBasic() : (state.advanced ?? [])))
 
@@ -329,6 +334,7 @@ watch(
         :domain-count="result.domainCount"
         :width="result.width"
         @reset-from-basic="resetFromBasic"
+        @reset="resetAll"
       />
       <div class="results">
         <CapacitySummary
