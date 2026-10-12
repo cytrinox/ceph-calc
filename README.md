@@ -38,6 +38,16 @@ Source: <https://github.com/cytrinox/ceph-calc>
 - Comparison table of all presets on the current topology, plus a chart: usable capacity as a line (TB on the
   left axis, efficiency as % of raw on the right; both are the same series since raw is shared) over stacked bars
   of survives / needs, with the available failure domains as a dashed line. Click a row or column to select it.
+- Recommendations panel (shown only when there is one; each recommendation starts collapsed to its headline and
+  expands on click): with a recovery reserve, the planned data fills healthy OSDs well below the planning nearfull
+  ratio, so it recommends setting Ceph's `nearfull_ratio` to that level (e.g. 0.68 instead of 0.85 for 5 hosts and
+  reserve 1). Ceph then warns as soon as more data is stored than planned, while a failure can still be recovered
+  below 0.85. For replication with size 1 it lists the settings Ceph needs: `mon_allow_pool_size_one` (always part
+  of the commands) and `mon_warn_on_pool_no_redundancy false` against the permanent HEALTH_WARN. The commands panel
+  applies these with an "Apply recommendations" toggle, one toggle per recommendation. Recommendations that change
+  the setup itself (a recovery reserve of 1 instead of 0, 3 copies instead of 1, hosts instead of OSDs as failure
+  domain, each with its cost in real net capacity) have an "Adopt recommendation" button: it changes the inputs, and
+  the recommendation is replaced by a short "Adopted" note that fades out.
 - Ceph commands panel: the full command sequence for the configuration (fill ratios, EC profile, CRUSH rule,
   pool create, size/min_size (replicated), EC options, autoscaler hints, compression, quotas, application,
   protection flags), with copy-all, per-section copy and download as a shell script. EC pools only get a

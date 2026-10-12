@@ -97,6 +97,33 @@ describe('buildCommands', () => {
     expect(s).not.toContain('pool set data size 1\n')
   })
 
+  it('applies recommended ratios, even without the other cluster-wide ratios', () => {
+    const overrides = { ratioOverrides: { nearfull: 0.68 } }
+    const all = script(input({ kind: 'replicated', size: 3, minSize: 2 }, defaultPoolOptions(), overrides))
+    expect(all).toContain('ceph osd set-nearfull-ratio 0.68  # recommended (planning value 0.85)')
+    expect(all).toContain('ceph osd set-backfillfull-ratio 0.90\nceph osd set-full-ratio 0.95')
+    const only = script(
+      input({ kind: 'replicated', size: 3, minSize: 2 }, defaultPoolOptions(), { ...overrides, includeClusterRatios: false }),
+    )
+    expect(only).toContain('# Cluster-wide fill ratios')
+    expect(only).toContain('ceph osd set-nearfull-ratio 0.68')
+    expect(only).not.toContain('set-backfillfull-ratio')
+    const none = script(input({ kind: 'replicated', size: 3, minSize: 2 }, defaultPoolOptions(), { includeClusterRatios: false }))
+    expect(none).not.toContain('Cluster-wide fill ratios')
+  })
+
+  it('emits config settings from applied recommendations before the pool is created', () => {
+    const configSettings = [{ option: 'mon_warn_on_pool_no_redundancy', value: 'false' }]
+    const s = script(input({ kind: 'replicated', size: 1, minSize: 1 }, defaultPoolOptions(), { configSettings }))
+    expect(s).toContain(
+      '# Recommended settings\n# From the Recommendations panel; they apply to the whole cluster.\n' +
+        'ceph config set global mon_warn_on_pool_no_redundancy false',
+    )
+    expect(s.indexOf('# Recommended settings')).toBeLessThan(s.indexOf('ceph osd pool create'))
+    expect(s).toContain('ceph config set global mon_allow_pool_size_one true  # single-copy pools are blocked by default')
+    expect(script(input({ kind: 'replicated', size: 1, minSize: 1 }))).not.toContain('Recommended settings')
+  })
+
   it('enables EC optimizations only when chosen', () => {
     const pool = { ...defaultPoolOptions(), ecOptimizations: true }
     expect(script(input({ kind: 'ec', k: 4, m: 2 }, pool))).toContain(

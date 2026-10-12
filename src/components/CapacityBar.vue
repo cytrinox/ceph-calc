@@ -1,46 +1,21 @@
 <script setup lang="ts">
 import { computed } from 'vue'
+import DistributionBar from './DistributionBar.vue'
 import RatioMarker from './RatioMarker.vue'
 import { formatPct } from '@/lib/format'
 import { formatCapacity } from '@/lib/units'
 import { dataUntilRatio, rawUntilRatio, type CapacityResult } from '@/lib/ceph'
 import { plural, type DomainType } from '@/lib/topology'
+import { distributionSegments } from '@/lib/distribution'
 
 const props = defineProps<{ result: CapacityResult; domain: DomainType; recoveryReserve: number }>()
 
 const share = (tb: number) => (props.result.rawTB > 0 ? tb / props.result.rawTB : 0)
 
-const segments = computed(() => [
-  { key: 'usable', label: 'Usable data', note: 'what you can store', tb: props.result.usableTB },
-  { key: 'protection', label: 'Protection overhead', note: 'replicas / parity', tb: props.result.protectionTB },
-  { key: 'reserved', label: 'Reserved headroom', note: 'kept free on purpose', tb: props.result.reservedTB },
-  { key: 'unusable', label: 'Unusable', note: 'can never be filled', tb: props.result.unusableTB },
-])
+const segments = computed(() => distributionSegments(props.result))
 
 // The unusable block only appears when there is unusable space (balanced clusters have none).
 const legend = computed(() => segments.value.filter((s) => s.key !== 'unusable' || s.tb > 1e-9))
-
-/** Where healthy OSDs reach each fill ratio, as a share of raw capacity. */
-const markers = computed(() => {
-  const r = props.result
-  if (!r.valid || r.rawTB <= 0) return []
-  const defs = [
-    { key: 'nearfull', label: 'nearfull', effect: 'health warning' },
-    { key: 'backfillfull', label: 'backfillfull', effect: 'recovery stops' },
-    { key: 'full', label: 'full', effect: 'writes stop' },
-  ] as const
-  return defs.map((d) => {
-    const ratio = r.fillRatios[d.key]
-    const storedTB = r.healthyPlaceableTB * ratio
-    const position = Math.min(1, storedTB / r.rawTB)
-    return {
-      ...d,
-      ratio,
-      position,
-      title: `${d.label} ${ratio.toFixed(2)} (${d.effect}): reached at ${formatCapacity(storedTB)} raw stored, ${formatCapacity(storedTB * r.dataFraction)} of data`,
-    }
-  })
-})
 
 /**
  * Additional data (net) that fits between the planned fill and the backfillfull / full markers
@@ -78,44 +53,7 @@ const breakdowns = computed(() => {
 
 <template>
   <div class="capacity-bar">
-    <div class="bar-head">
-      <span class="title">Raw data distribution:</span>
-      <span class="total">{{ formatCapacity(result.rawTB) }} = 100%</span>
-    </div>
-    <div class="track">
-      <div v-if="markers.length" class="markers">
-        <span
-          v-for="m in markers"
-          :key="m.key"
-          :class="['marker', m.key]"
-          :style="{ left: `${m.position * 100}%` }"
-          :title="m.title"
-          role="img"
-          :aria-label="m.title"
-        >
-          <RatioMarker :kind="m.key" />
-        </span>
-      </div>
-      <span
-        v-for="m in markers"
-        :key="`tick-${m.key}`"
-        :class="['tick', m.key]"
-        :style="{ left: `${m.position * 100}%` }"
-        aria-hidden="true"
-      />
-    <div class="bar" role="img" :aria-label="segments.map((s) => `${s.label} ${formatCapacity(s.tb)}`).join(', ')">
-      <div
-        v-for="s in segments"
-        v-show="s.tb > 0"
-        :key="s.key"
-        :class="['seg', s.key]"
-        :style="{ width: `${share(s.tb) * 100}%` }"
-        :title="`${s.label}: ${formatCapacity(s.tb)} (${formatPct(share(s.tb))})`"
-      >
-        <span v-if="share(s.tb) >= 0.1" class="pct">{{ formatPct(share(s.tb)) }}</span>
-      </div>
-    </div>
-    </div>
+    <DistributionBar :result="result" />
 
     <ul class="legend" :class="`cols-${legend.length}`">
       <li v-for="s in legend" :key="s.key" :class="s.key">
@@ -141,126 +79,6 @@ const breakdowns = computed(() => {
 </template>
 
 <style lang="scss" scoped>
-.bar-head {
-  display: flex;
-  justify-content: space-between;
-  align-items: baseline;
-  gap: 1rem;
-  margin-bottom: 0.6rem;
-
-  .title {
-    font-family: $font-display;
-    font-weight: 700;
-    font-size: 0.95rem;
-  }
-
-  .total {
-    font-family: $font-mono;
-    font-size: 0.78rem;
-    color: var(--text-muted);
-  }
-}
-
-$marker-h: 11px;
-
-.tick.nearfull {
-  color: var(--marker-nearfull);
-}
-
-.tick.backfillfull {
-  color: var(--marker-backfillfull);
-}
-
-.tick.full {
-  color: var(--marker-full);
-}
-
-.track {
-  position: relative;
-}
-
-.markers {
-  position: relative;
-  height: $marker-h + 2px;
-}
-
-.marker {
-  position: absolute;
-  bottom: 2px;
-  transform: translateX(-50%);
-  line-height: 0;
-  cursor: help;
-}
-
-.tick {
-  position: absolute;
-  top: $marker-h + 2px;
-  bottom: 0;
-  width: 0;
-  border-left: 1.5px dashed currentColor;
-  transform: translateX(-50%);
-  opacity: 0.85;
-  pointer-events: none;
-  z-index: 1;
-}
-
-.bar {
-  display: flex;
-  height: 40px;
-  border-radius: $radius-sm;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  background: var(--reserved);
-}
-
-.seg {
-  display: flex;
-  align-items: center;
-  padding: 0 0.6rem;
-  flex: 0 0 auto;
-  min-width: 0;
-  transition: width 0.35s ease;
-  overflow: hidden;
-
-  & + .seg {
-    border-left: 1px solid var(--panel);
-  }
-
-  .pct {
-    font-family: $font-mono;
-    font-size: 0.78rem;
-    font-weight: 500;
-  }
-}
-
-.seg.usable {
-  background: var(--accent);
-  color: var(--on-accent);
-}
-
-.seg.protection {
-  background: var(--protection);
-  color: #fff;
-}
-
-.seg.reserved {
-  color: var(--text-muted);
-  background: repeating-linear-gradient(
-    135deg,
-    var(--reserved) 0 7px,
-    var(--reserved-stripe) 7px 9px
-  );
-}
-
-.seg.unusable {
-  color: var(--text-muted);
-  background: repeating-linear-gradient(
-    135deg,
-    var(--unusable) 0 7px,
-    var(--unusable-stripe) 7px 9px
-  );
-}
-
 // Legend columns follow the card width (not the viewport): four blocks go 4 → 2 × 2 → 1.
 .capacity-bar {
   container-type: inline-size;
@@ -385,12 +203,6 @@ $marker-h: 11px;
     flex: 0 0 auto;
     font-family: $font-mono;
     color: var(--text);
-  }
-}
-
-@include below($bp-sm) {
-  .bar {
-    height: 38px;
   }
 }
 </style>

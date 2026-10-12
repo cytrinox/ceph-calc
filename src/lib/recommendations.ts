@@ -1,0 +1,353 @@
+// Recommendations derived from the capacity result and the pool layout, shown in their own panel. Two kinds:
+// - applied: Ceph settings (`ratios`, `config`) that the commands panel can add to the generated commands;
+// - adopted: changes to the calculator's own setup (`adopt`), taken over with a button.
+// Add new kinds to `recommendations()`.
+
+import { computeCapacity, type CapacityInput, type CapacityResult, type Scheme, type Tunables } from './ceph'
+import { formatPct } from './format'
+import { PRESETS } from './schemes'
+import { plural, type DomainType } from './topology'
+import { formatCapacity } from './units'
+
+export type RatioKey = 'nearfull' | 'backfillfull' | 'full'
+
+/** A `ceph config set global <option> <value>` setting. */
+export interface ConfigSetting {
+  option: string
+  value: string
+}
+
+export interface RecommendationInput {
+  /** The failure domains, for what-if calculations of a changed setup. */
+  input: CapacityInput
+  result: CapacityResult
+  tunables: Tunables
+  scheme: Scheme
+  domain: DomainType
+  /** The same topology with hosts as failure domains; only needed while spreading across OSDs. */
+  hostInput?: CapacityInput
+}
+
+export type MarkerKind = 'nearfull' | 'backfillfull' | 'full' | 'recommended'
+
+/** Calculator inputs an adopted recommendation changes. */
+export interface SetupChange {
+  recoveryReserve?: number
+  scheme?: Scheme
+  failureDomain?: DomainType
+}
+
+/** "Switch parameter X from A to B", with short notes and optional ratio markers. */
+export interface SettingChange {
+  parameter: string
+  from: string
+  to: string
+  fromNote?: string
+  toNote?: string
+  fromMarker?: MarkerKind
+  toMarker?: MarkerKind
+}
+
+export interface Recommendation {
+  id: string
+  /** `critical` when the current setup risks data loss (red warning sign), else `info` (light bulb). */
+  severity: 'info' | 'critical'
+  /** Headline, e.g. "Set the cluster's nearfull ratio to 0.68". */
+  title: string
+  /** The settings it changes. */
+  changes: SettingChange[]
+  /** Explanation paragraphs. */
+  details: string[]
+  /** Short label for its toggle in the commands panel (applied recommendations). */
+  toggleLabel?: string
+  /** Cluster-wide ratios it sets when applied. */
+  ratios?: Partial<Record<RatioKey, number>>
+  /** Config options it sets when applied. */
+  config?: ConfigSetting[]
+  /** Show the raw data distribution with a marker at this nearfull ratio. */
+  distribution?: { nearfull: number }
+  /** Setup change taken over with "Adopt recommendation"; `summary` names it afterwards ("recovery reserve of 1 host"). */
+  adopt?: { summary: string; setup: SetupChange }
+}
+
+/** Whether the recommendation changes the generated commands (and so gets a toggle in the commands panel). */
+export function isApplicable(rec: Recommendation): boolean {
+  return Object.keys(rec.ratios ?? {}).length > 0 || (rec.config?.length ?? 0) > 0
+}
+
+const ratio = (r: number) => r.toFixed(2)
+
+/**
+ * The Ceph nearfull_ratio that warns as soon as the stored data exceeds the plan. With a recovery reserve the plan
+ * keeps healthy OSDs at `healthyFill`, so that after losing the reserved domains and recovering their data they
+ * reach the planning nearfull ratio. Rounded down, so the warning comes at or just before that point.
+ */
+export function nearfullRecommendation({ result, tunables, domain }: RecommendationInput): Recommendation | null {
+  const reserve = Math.floor(tunables.recoveryReserve || 0)
+  const planning = result.fillRatios.nearfull
+  const recommended = Math.floor(result.healthyFill * 100 + 1e-9) / 100
+  // Without a tolerated failure (size 1) there is nothing to recover, so the reserve has no meaning here.
+  if (!result.valid || reserve <= 0 || result.failuresTolerated <= 0) return null
+  if (!(recommended > 0) || recommended >= Number(ratio(planning))) return null
+  const failed = `${reserve} failed ${plural(domain, reserve)}`
+  const p = ratio(planning)
+  const r = ratio(recommended)
+  return {
+    id: 'nearfull-ratio',
+    severity: 'info',
+    title: `Set the cluster's nearfull ratio to ${r}`,
+    changes: [
+      {
+        parameter: 'nearfull_ratio',
+        from: p,
+        fromNote: `planning value (step 3): highest OSD fill after recovering ${failed}`,
+        fromMarker: 'nearfull',
+        to: r,
+        toNote: 'healthy OSDs reach it when the data exceeds the plan',
+        toMarker: 'recommended',
+      },
+    ],
+    details: [
+      `With a recovery reserve of ${reserve} ${plural(domain, reserve)}, the planned data fills healthy OSDs to only ` +
+        `${formatPct(result.healthyFill)}: the rest is kept free to recover ${failed} and still stay below ${p}.`,
+      `Ceph's nearfull warning at ${p} would only fire once that reserve is used up, when a failure could no longer ` +
+        `be recovered below ${p}. At ${r} (the larger marker, where the planned data ends), Ceph warns as soon as ` +
+        `more data is stored than planned.`,
+      `After a failure and recovery the OSDs are near ${p}, so the warning stays on until the failed ` +
+        `${plural(domain, 1)} is replaced: the reserve is in use.`,
+      `Only change it if this pool is alone on the cluster: nearfull_ratio is cluster-wide, not per pool. With ` +
+        `other pools, or OSDs of other device classes that fill at their own pace, the lower ratio would also warn ` +
+        `for data that follows other plans. Then keep ${p} and watch this pool's usage (ceph df) instead.`,
+    ],
+    toggleLabel: `nearfull_ratio ${r} instead of ${p}`,
+    ratios: { nearfull: recommended },
+    distribution: { nearfull: recommended },
+  }
+}
+
+/**
+ * Settings for a replicated pool with size 1. Ceph refuses it without mon_allow_pool_size_one (the generated
+ * commands always set that), and afterwards keeps HEALTH_WARN for as long as the pool exists unless
+ * mon_warn_on_pool_no_redundancy is switched off.
+ */
+export function singleCopyRecommendation({ scheme, tunables, domain }: RecommendationInput): Recommendation | null {
+  if (scheme.kind !== 'replicated' || scheme.size !== 1) return null
+  const reserve = Math.floor(tunables.recoveryReserve || 0)
+  const details = [
+    'Ceph refuses pools with size 1 unless mon_allow_pool_size_one is true, and the size change needs ' +
+      '--yes-i-really-mean-it. Both are already part of the generated commands.',
+    'Once the pool exists, Ceph reports HEALTH_WARN "pool(s) have no replicas configured" for as long as it keeps a ' +
+      'single copy. A permanent warning hides new problems; mon_warn_on_pool_no_redundancy = false silences it, ' +
+      'for every pool in the cluster.',
+  ]
+  if (reserve > 0) {
+    details.push(
+      `A recovery reserve of ${reserve} ${plural(domain, reserve)} doesn't help a single-copy pool: a failed ` +
+        `${plural(domain, 1)} loses its data, nothing can be recovered. A reserve of 0 gives the space back.`,
+    )
+  }
+  details.push('Use size 1 only for data you can recreate: any failed OSD loses data.')
+  return {
+    id: 'single-copy',
+    severity: 'info',
+    title: 'Prepare Ceph for a single-copy pool',
+    changes: [
+      {
+        parameter: 'mon_allow_pool_size_one',
+        from: 'false',
+        fromNote: 'Ceph default',
+        to: 'true',
+        toNote: 'required for size 1; already in the commands',
+      },
+      {
+        parameter: 'mon_warn_on_pool_no_redundancy',
+        from: 'true',
+        fromNote: 'Ceph default',
+        to: 'false',
+        toNote: 'silences the permanent HEALTH_WARN',
+      },
+    ],
+    details,
+    toggleLabel: 'mon_warn_on_pool_no_redundancy false',
+    config: [{ option: 'mon_warn_on_pool_no_redundancy', value: 'false' }],
+  }
+}
+
+/**
+ * A recovery reserve of 1 when none is planned: without it a failed domain can't be recovered. Only when a spare
+ * domain exists (otherwise the layout could not be placed) and the layout survives a failure at all.
+ */
+export function recoveryReserveRecommendation({
+  input,
+  result,
+  tunables,
+  scheme,
+  domain,
+}: RecommendationInput): Recommendation | null {
+  if (Math.floor(tunables.recoveryReserve || 0) > 0 || !result.valid || result.failuresTolerated <= 0) return null
+  const withReserve = computeCapacity(input, scheme, { ...tunables, recoveryReserve: 1 })
+  if (!withReserve.valid) return null
+  const one = plural(domain, 1)
+  return {
+    id: 'recovery-reserve',
+    severity: 'info',
+    title: `Plan a recovery reserve of 1 ${one}`,
+    changes: [
+      {
+        parameter: 'recovery reserve (step 3)',
+        from: '0',
+        fromNote: `${formatCapacity(result.usableTB)} real net capacity`,
+        to: '1',
+        toNote: `${formatCapacity(withReserve.usableTB)} real net capacity`,
+      },
+    ],
+    details: [
+      `Without a recovery reserve the cluster may be filled right up to nearfull. When a ${one} fails, its data ` +
+        `can't be re-created on the others: backfill stops at backfillfull, placement groups stay degraded until ` +
+        `the hardware is replaced, and a further failure can lose data.`,
+      `A reserve of 1 ${one} keeps enough space free to recover a failed ${one} automatically. It costs ` +
+        `${formatCapacity(result.usableTB - withReserve.usableTB)} of real net capacity.`,
+    ],
+    adopt: { summary: `recovery reserve of 1 ${one}`, setup: { recoveryReserve: 1 } },
+  }
+}
+
+/** More than one copy for replication size 1: 3x (Ceph's default), or 2x when only 2 domains are available. */
+export function replicationRecommendation({
+  input,
+  result,
+  tunables,
+  scheme,
+  domain,
+}: RecommendationInput): Recommendation | null {
+  if (scheme.kind !== 'replicated' || scheme.size !== 1) return null
+  const target = ['rep3', 'rep2']
+    .map((id) => PRESETS.find((p) => p.id === id)!.scheme)
+    .find((s) => computeCapacity(input, s, tunables).valid)
+  if (!target || target.kind !== 'replicated') return null
+  const better = computeCapacity(input, target, tunables)
+  const size = target.size
+  const domains = plural(domain)
+  return {
+    id: 'replication',
+    // A single copy loses data with any failed OSD.
+    severity: 'critical',
+    title: `Keep ${size} copies instead of 1`,
+    changes: [
+      {
+        parameter: 'pool layout (step 2)',
+        from: 'size 1',
+        fromNote: `${formatCapacity(result.usableTB)} real net capacity, survives no failure`,
+        to: `size ${size}`,
+        toNote:
+          `${formatCapacity(better.usableTB)} real net capacity, survives ${better.failuresTolerated} failed ` +
+          plural(domain, better.failuresTolerated),
+      },
+    ],
+    details: [
+      'With a single copy every failed OSD loses data: there is nothing to recover from.',
+      size === 3
+        ? `Replication 3x, Ceph's default, keeps the data when up to 2 ${domains} fail and keeps serving I/O with one failed.`
+        : `Replication 2x keeps the data when a ${plural(domain, 1)} fails. With 3 ${domains} or more, 3 copies are safer.`,
+      `It costs ${formatCapacity(result.usableTB - better.usableTB)} of real net capacity. Keep size 1 only for data ` +
+        `you can recreate.`,
+    ],
+    adopt: { summary: `replication ${size}x`, setup: { scheme: { ...target } } },
+  }
+}
+
+/**
+ * Hosts instead of OSDs as failure domain when there are several hosts: with OSDs, several copies (chunks) of an
+ * object can share a host, so one failed host can take more than the pool tolerates. Keeps the recovery reserve, or
+ * lowers it as far as needed when there are too few hosts for it.
+ */
+export function failureDomainRecommendation({
+  result,
+  tunables,
+  scheme,
+  domain,
+  hostInput,
+}: RecommendationInput): Recommendation | null {
+  if (domain !== 'osd' || !hostInput || !result.valid || result.failuresTolerated <= 0) return null
+  const hosts = hostInput.groups.reduce((n, g) => n + g.mult, 0)
+  if (hosts < 2) return null
+  const reserve = Math.floor(tunables.recoveryReserve || 0)
+  let kept = reserve
+  let better = computeCapacity(hostInput, scheme, tunables)
+  while (!better.valid && kept > 0) {
+    kept--
+    better = computeCapacity(hostInput, scheme, { ...tunables, recoveryReserve: kept })
+  }
+  if (!better.valid) return null
+
+  const replicated = scheme.kind === 'replicated'
+  const copies = replicated ? 'copies' : 'chunks'
+  const tolerated = better.failuresTolerated
+  const changes: SettingChange[] = [
+    {
+      parameter: 'spread across (step 2)',
+      from: plural('osd'),
+      fromNote: `${formatCapacity(result.usableTB)} real net capacity; a failed host can take several ${copies}`,
+      to: plural('host'),
+      toNote:
+        `${formatCapacity(better.usableTB)} real net capacity, survives ${tolerated} failed ` +
+        plural('host', tolerated),
+    },
+  ]
+  if (kept < reserve) {
+    changes.push({
+      parameter: 'recovery reserve (step 3)',
+      from: String(reserve),
+      fromNote: 'counts OSDs',
+      to: String(kept),
+      toNote: kept > 0 ? 'counts hosts' : 'no spare host for a reserve',
+    })
+  }
+
+  const delta = result.usableTB - better.usableTB
+  const capacity =
+    Math.abs(delta) <= result.usableTB * 0.005
+      ? 'The real net capacity stays the same.'
+      : delta > 0
+        ? `It costs ${formatCapacity(delta)} of real net capacity.`
+        : `It gives ${formatCapacity(-delta)} more real net capacity, as the recovery reserve drops.`
+  const details = [
+    `With OSDs as failure domain, CRUSH only keeps the ${copies} of an object on different OSDs, not on different ` +
+      `hosts. A single failed host can take more of them than the pool tolerates: the data is unavailable until the ` +
+      `host is back, and lost if its drives are.`,
+    `With hosts as failure domain every ${replicated ? 'copy' : 'chunk'} is on a different host, so the pool ` +
+      `survives ${tolerated} failed ${plural('host', tolerated)}. ${capacity}`,
+  ]
+  if (kept < reserve) {
+    details.push(
+      `With ${hosts} hosts there is no spare host for a recovery reserve of ${reserve}, so it drops to ${kept}.`,
+    )
+  } else if (reserve > 0) {
+    details.push(
+      `The recovery reserve of ${reserve} then counts hosts: it keeps room for ${reserve} failed ` +
+        `${plural('host', reserve)} instead of ${reserve} ${plural('osd', reserve)}.`,
+    )
+  }
+  return {
+    id: 'failure-domain',
+    // A failed host can take more copies than the pool tolerates.
+    severity: 'critical',
+    title: `Spread the ${copies} across hosts instead of OSDs`,
+    changes,
+    details,
+    adopt: {
+      summary: kept < reserve ? `spread across hosts, recovery reserve ${kept}` : 'spread across hosts',
+      setup: kept < reserve ? { failureDomain: 'host', recoveryReserve: kept } : { failureDomain: 'host' },
+    },
+  }
+}
+
+export function recommendations(input: RecommendationInput): Recommendation[] {
+  return [
+    replicationRecommendation(input),
+    failureDomainRecommendation(input),
+    singleCopyRecommendation(input),
+    recoveryReserveRecommendation(input),
+    nearfullRecommendation(input),
+  ].filter((r): r is Recommendation => r !== null)
+}

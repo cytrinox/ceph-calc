@@ -6,6 +6,7 @@ import type { Scheme, Tunables } from '@/lib/ceph'
 import { copyText } from '@/lib/clipboard'
 import { buildCommands, commandsToScript, type CommandSection } from '@/lib/commands'
 import { poolIssues, type PoolOptions } from '@/lib/pool'
+import { isApplicable, type Recommendation } from '@/lib/recommendations'
 import type { DomainType } from '@/lib/topology'
 
 const props = defineProps<{
@@ -15,9 +16,23 @@ const props = defineProps<{
   tunables: Tunables
   /** Message when the layout cannot be placed on the topology. */
   placementProblem?: string
+  recommendations: Recommendation[]
 }>()
 
 const includeClusterRatios = ref(true)
+
+// Recommendations that change the commands are opt-in; once applied, each can still be switched off on its own.
+// (Recommendations that change the setup are adopted in their panel instead.)
+const applicable = computed(() => props.recommendations.filter(isApplicable))
+const applyRecommendations = ref(false)
+const skipped = ref<string[]>([])
+const applied = computed(() =>
+  applyRecommendations.value ? applicable.value.filter((r) => !skipped.value.includes(r.id)) : [],
+)
+
+function setApplied(id: string, on: boolean) {
+  skipped.value = on ? skipped.value.filter((s) => s !== id) : [...skipped.value, id]
+}
 
 const sections = computed(() =>
   buildCommands({
@@ -26,6 +41,8 @@ const sections = computed(() =>
     domain: props.domain,
     tunables: props.tunables,
     includeClusterRatios: includeClusterRatios.value,
+    ratioOverrides: Object.assign({}, ...applied.value.map((r) => r.ratios ?? {})),
+    configSettings: applied.value.flatMap((r) => r.config ?? []),
   }),
 )
 
@@ -96,6 +113,23 @@ function download() {
         label="Include cluster-wide ratios"
         hint="nearfull / backfillfull / full apply to all pools"
       />
+      <template v-if="applicable.length">
+        <ToggleField
+          v-model="applyRecommendations"
+          label="Apply recommendations"
+          :hint="`${applicable.length} ${applicable.length === 1 ? 'recommendation' : 'recommendations'} from the panel above`"
+        />
+        <div v-if="applyRecommendations" class="recommendation-toggles">
+          <ToggleField
+            v-for="rec in applicable"
+            :key="rec.id"
+            :model-value="!skipped.includes(rec.id)"
+            :label="rec.toggleLabel ?? rec.title"
+            :hint="rec.title"
+            @update:model-value="(on: boolean) => setApplied(rec.id, on)"
+          />
+        </div>
+      </template>
     </div>
 
     <ul v-if="problems.length" class="problems">
@@ -172,6 +206,15 @@ function download() {
     color: var(--text-muted);
     font-size: 0.86rem;
   }
+}
+
+// One toggle per recommendation, indented under "Apply recommendations".
+.recommendation-toggles {
+  display: grid;
+  gap: 0.4rem;
+  margin-left: 0.2rem;
+  padding-left: 0.9rem;
+  border-left: 2px solid var(--border-strong);
 }
 
 .problems {

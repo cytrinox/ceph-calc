@@ -1,0 +1,177 @@
+import { describe, expect, it } from 'vitest'
+import { computeCapacity, DEFAULT_RATIOS, type CapacityInput, type Scheme, type Tunables } from './ceph'
+import { isApplicable, recommendations } from './recommendations'
+import { buildBasicTopology, failureDomains, TOPOLOGY_EXAMPLES, type DomainType } from './topology'
+
+const rep3: Scheme = { kind: 'replicated', size: 3, minSize: 2 }
+const ratios = { fullRatio: DEFAULT_RATIOS.full, backfillfullRatio: DEFAULT_RATIOS.backfillfull, nearfullRatio: DEFAULT_RATIOS.nearfull }
+const hosts = (n: number) => failureDomains(buildBasicTopology({ hosts: n, osdsPerHost: 8, osdSizeTB: 8 }), 'host')
+
+function recs(input: CapacityInput, scheme: Scheme, tunables: Tunables, domain: DomainType = 'host') {
+  return recommendations({ input, result: computeCapacity(input, scheme, tunables), tunables, scheme, domain })
+}
+
+const ids = (list: { id: string }[]) => list.map((r) => r.id)
+
+describe('nearfull recommendation', () => {
+  it('is not needed without a recovery reserve', () => {
+    expect(ids(recs(hosts(5), rep3, { ...ratios, recoveryReserve: 0 }))).not.toContain('nearfull-ratio')
+  })
+
+  it('recommends the healthy fill of the plan as the cluster nearfull ratio', () => {
+    const [one] = recs(hosts(5), rep3, { ...ratios, recoveryReserve: 1 }) // 4/5 × 0.85
+    expect(one.ratios).toEqual({ nearfull: 0.68 })
+    expect(one.title).toBe("Set the cluster's nearfull ratio to 0.68")
+    expect(one.severity).toBe('info')
+    expect(one.toggleLabel).toBe('nearfull_ratio 0.68 instead of 0.85')
+    expect(one.changes).toMatchObject([
+      { parameter: 'nearfull_ratio', from: '0.85', to: '0.68', fromMarker: 'nearfull', toMarker: 'recommended' },
+    ])
+    expect(one.details.join(' ')).toContain('1 failed host')
+    expect(one.details.join(' ')).toContain('nearfull_ratio is cluster-wide, not per pool')
+    expect(one.distribution).toEqual({ nearfull: 0.68 })
+    expect(recs(hosts(5), rep3, { ...ratios, recoveryReserve: 2 })[0].ratios).toEqual({ nearfull: 0.51 }) // 3/5 × 0.85
+  })
+
+  it('rounds down for unbalanced layouts', () => {
+    const ex = TOPOLOGY_EXAMPLES.find((e) => e.id === 'unbalanced-hosts')!
+    const input = failureDomains(ex.build(), ex.domain)
+    // 30 TB placeable after losing the 20 TB host × 0.85 / 45 TB healthy placeable = 0.5667
+    expect(recs(input, ex.scheme, { ...ratios, recoveryReserve: 1 })[0].ratios).toEqual({ nearfull: 0.56 })
+  })
+
+  it('follows the planning ratio and names the failure domain', () => {
+    const allOne = { fullRatio: 1, backfillfullRatio: 1, nearfullRatio: 1, recoveryReserve: 1 }
+    expect(recs(hosts(5), rep3, allOne)[0].ratios).toEqual({ nearfull: 0.8 })
+    const racks = TOPOLOGY_EXAMPLES.find((e) => e.id === 'racks')!
+    const [rack] = recs(failureDomains(racks.build(), 'rack'), racks.scheme, { ...ratios, recoveryReserve: 1 }, 'rack')
+    expect(rack.changes[0].fromNote).toBe('planning value (step 3): highest OSD fill after recovering 1 failed rack')
+  })
+
+  it('has nothing to say about invalid layouts', () => {
+    expect(recs(hosts(3), rep3, { ...ratios, recoveryReserve: 1 })).toEqual([])
+  })
+})
+
+describe('single-copy recommendation', () => {
+  const size1: Scheme = { kind: 'replicated', size: 1, minSize: 1 }
+
+  it('recommends silencing the no-redundancy warning for size 1', () => {
+    const list = recs(hosts(5), size1, { ...ratios, recoveryReserve: 0 })
+    expect(ids(list)).toEqual(['replication', 'single-copy'])
+    const single = list[1]
+    expect(single.config).toEqual([{ option: 'mon_warn_on_pool_no_redundancy', value: 'false' }])
+    expect(single.changes.map((c) => `${c.parameter}: ${c.from} -> ${c.to}`)).toEqual([
+      'mon_allow_pool_size_one: false -> true',
+      'mon_warn_on_pool_no_redundancy: true -> false',
+    ])
+    expect(single.details.join(' ')).not.toContain('recovery reserve')
+  })
+
+  it('explains that a recovery reserve does not help, without a nearfull recommendation', () => {
+    const list = recs(hosts(5), size1, { ...ratios, recoveryReserve: 1 })
+    expect(ids(list)).toEqual(['replication', 'single-copy'])
+    expect(list[1].details.join(' ')).toContain("A recovery reserve of 1 host doesn't help a single-copy pool")
+  })
+
+  it('is only for replication size 1', () => {
+    for (const scheme of [{ kind: 'replicated', size: 2, minSize: 1 }, rep3, { kind: 'ec', k: 4, m: 2 }] as Scheme[]) {
+      expect(recs(hosts(8), scheme, { ...ratios, recoveryReserve: 0 }).map((r) => r.id)).not.toContain('single-copy')
+    }
+  })
+})
+
+describe('adoptable recommendations', () => {
+  const size1: Scheme = { kind: 'replicated', size: 1, minSize: 1 }
+
+  it('recommends a recovery reserve of 1 when none is planned and a spare domain exists', () => {
+    const rec = recs(hosts(5), rep3, { ...ratios, recoveryReserve: 0 }).find((r) => r.id === 'recovery-reserve')!
+    expect(rec.title).toBe('Plan a recovery reserve of 1 host')
+    expect(rec.severity).toBe('info')
+    expect(rec.adopt).toEqual({ summary: 'recovery reserve of 1 host', setup: { recoveryReserve: 1 } })
+    // 5 × 64 TB × 0.85 / 3 = 90.7 TB without, 4/5 of it (72.5 TB) with the reserve
+    expect(rec.changes[0]).toMatchObject({ from: '0', to: '1', fromNote: '90.7 TB real net capacity', toNote: '72.5 TB real net capacity' })
+    expect(isApplicable(rec)).toBe(false)
+    // no spare host (3 hosts, 3 copies), nothing planned already, or nothing to recover (size 1)
+    expect(ids(recs(hosts(3), rep3, { ...ratios, recoveryReserve: 0 }))).not.toContain('recovery-reserve')
+    expect(ids(recs(hosts(5), rep3, { ...ratios, recoveryReserve: 1 }))).not.toContain('recovery-reserve')
+    expect(ids(recs(hosts(5), size1, { ...ratios, recoveryReserve: 0 }))).not.toContain('recovery-reserve')
+  })
+
+  it('recommends 3 copies instead of 1, or 2 when only 2 domains exist', () => {
+    const three = recs(hosts(5), size1, { ...ratios, recoveryReserve: 0 })[0]
+    expect(three.title).toBe('Keep 3 copies instead of 1')
+    expect(three.severity).toBe('critical')
+    expect(three.adopt).toEqual({ summary: 'replication 3x', setup: { scheme: rep3 } })
+    expect(three.changes[0].toNote).toContain('survives 2 failed hosts')
+    const two = recs(hosts(2), size1, { ...ratios, recoveryReserve: 0 })[0]
+    expect(two.adopt?.setup.scheme).toEqual({ kind: 'replicated', size: 2, minSize: 1 })
+    // a single host offers no second domain: only the Ceph settings for size 1 remain
+    expect(ids(recs(hosts(1), size1, { ...ratios, recoveryReserve: 0 }))).toEqual(['single-copy'])
+  })
+
+  it('keeps the applied recommendations applicable', () => {
+    const list = recs(hosts(5), rep3, { ...ratios, recoveryReserve: 1 })
+    expect(list.filter(isApplicable).map((r) => r.id)).toEqual(['nearfull-ratio'])
+  })
+})
+
+describe('failure-domain recommendation', () => {
+  const size1: Scheme = { kind: 'replicated', size: 1, minSize: 1 }
+  const ec42: Scheme = { kind: 'ec', k: 4, m: 2 }
+
+  /** Spread across OSDs of n hosts (8 × 8 TB each), with the host-level domains the recommendation needs. */
+  function osdRecs(n: number, scheme: Scheme, tunables: Tunables, withHosts = true) {
+    const topology = buildBasicTopology({ hosts: n, osdsPerHost: 8, osdSizeTB: 8 })
+    const input = failureDomains(topology, 'osd')
+    const hostInput = withHosts ? failureDomains(topology, 'host') : undefined
+    return recommendations({ input, result: computeCapacity(input, scheme, tunables), tunables, scheme, domain: 'osd', hostInput })
+  }
+
+  it('recommends hosts instead of OSDs as failure domain, as a risk of data loss', () => {
+    const list = osdRecs(5, rep3, { ...ratios, recoveryReserve: 0 })
+    expect(ids(list)).toEqual(['failure-domain', 'recovery-reserve'])
+    const [rec] = list
+    expect(rec.title).toBe('Spread the copies across hosts instead of OSDs')
+    expect(rec.severity).toBe('critical')
+    expect(rec.changes).toMatchObject([
+      { parameter: 'spread across (step 2)', from: 'OSDs', to: 'hosts', toNote: '90.7 TB real net capacity, survives 2 failed hosts' },
+    ])
+    expect(rec.details.join(' ')).toContain('The real net capacity stays the same.')
+    expect(rec.adopt).toEqual({ summary: 'spread across hosts', setup: { failureDomain: 'host' } })
+    expect(isApplicable(rec)).toBe(false)
+  })
+
+  it('speaks of chunks for EC and keeps a reserve that fits', () => {
+    const rec = osdRecs(8, ec42, { ...ratios, recoveryReserve: 1 })[0]
+    expect(rec.title).toBe('Spread the chunks across hosts instead of OSDs')
+    expect(rec.changes).toHaveLength(1)
+    expect(rec.details.join(' ')).toContain('it keeps room for 1 failed host instead of 1 OSD')
+    expect(rec.adopt?.setup).toEqual({ failureDomain: 'host' })
+  })
+
+  it('lowers the recovery reserve when there is no spare host for it', () => {
+    const rec = osdRecs(3, rep3, { ...ratios, recoveryReserve: 1 })[0]
+    expect(rec.id).toBe('failure-domain')
+    expect(rec.changes).toMatchObject([
+      { from: 'OSDs', to: 'hosts' },
+      { parameter: 'recovery reserve (step 3)', from: '1', to: '0', toNote: 'no spare host for a reserve' },
+    ])
+    expect(rec.details.join(' ')).toContain('With 3 hosts there is no spare host for a recovery reserve of 1, so it drops to 0.')
+    // 23 × 8 TB × 0.85 / 3 = 52.1 TB with 1 OSD reserved, 3 × 64 TB × 0.85 / 3 = 54.4 TB without a reserve
+    expect(rec.details.join(' ')).toContain('It gives 2.27 TB more real net capacity, as the recovery reserve drops.')
+    expect(rec.adopt).toEqual({
+      summary: 'spread across hosts, recovery reserve 0',
+      setup: { failureDomain: 'host', recoveryReserve: 0 },
+    })
+  })
+
+  it('is only offered when hosts can hold the layout and it protects anything', () => {
+    const none = { ...ratios, recoveryReserve: 0 }
+    expect(ids(osdRecs(2, rep3, none))).not.toContain('failure-domain') // 3 copies need 3 hosts
+    expect(ids(osdRecs(1, rep3, none))).not.toContain('failure-domain')
+    expect(ids(osdRecs(5, size1, none))).not.toContain('failure-domain')
+    expect(ids(osdRecs(5, rep3, none, false))).not.toContain('failure-domain')
+    expect(ids(recs(hosts(5), rep3, none))).not.toContain('failure-domain')
+  })
+})

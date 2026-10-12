@@ -4,6 +4,7 @@ import CapacitySummary from './components/CapacitySummary.vue'
 import CommandsPanel from './components/CommandsPanel.vue'
 import ConfigPanel from './components/ConfigPanel.vue'
 import FaqPanel from './components/FaqPanel.vue'
+import RecommendationsPanel from './components/RecommendationsPanel.vue'
 import SchemeTable from './components/SchemeTable.vue'
 import ShareButton from './components/ShareButton.vue'
 import ThemeToggle from './components/ThemeToggle.vue'
@@ -29,6 +30,7 @@ import {
 import { defaultState, readStateFromUrl, writeStateToUrl, type AppState } from './lib/urlState'
 import { channelTitle, versionLink } from './lib/version'
 import { estimateIops, iopsBasis } from './lib/iops'
+import { recommendations, type SetupChange } from './lib/recommendations'
 
 // Same calculator pictogram as the favicon (served from public/).
 const logoUrl = `${import.meta.env.BASE_URL}favicon.svg`
@@ -174,6 +176,26 @@ const warnings = computed(() => {
 
 const placementProblem = computed(() => placementMessage(result.value, state.failureDomain) ?? undefined)
 
+// Shown in their own panel (only when there are any) and optionally applied to the commands.
+const recommendationList = computed(() =>
+  recommendations({
+    input: input.value,
+    result: result.value,
+    tunables: tunables.value,
+    scheme: state.scheme,
+    domain: state.failureDomain,
+    // While spreading across OSDs: the same topology spread across hosts, for the failure-domain recommendation.
+    hostInput: state.failureDomain === 'osd' ? failureDomains(topology.value, 'host') : undefined,
+  }),
+)
+
+// "Adopt recommendation": take over its setup change; the recommendation then no longer applies and vanishes.
+function adoptRecommendation(setup: SetupChange) {
+  if (setup.recoveryReserve !== undefined) state.recoveryReserve = setup.recoveryReserve
+  if (setup.scheme) state.scheme = { ...setup.scheme }
+  if (setup.failureDomain) state.failureDomain = setup.failureDomain
+}
+
 // Effective capacity when the pool compresses data (only with compression enabled).
 const compression = computed(() => {
   const r = result.value
@@ -275,12 +297,14 @@ watch(
           :pool="state.pool"
           @select="selectScheme"
         />
+        <RecommendationsPanel :recommendations="recommendationList" :result="result" @adopt="adoptRecommendation" />
         <CommandsPanel
           :pool="state.pool"
           :scheme="state.scheme"
           :domain="state.failureDomain"
           :tunables="tunables"
           :placement-problem="placementProblem"
+          :recommendations="recommendationList"
         />
         <FaqPanel />
       </div>

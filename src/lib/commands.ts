@@ -2,6 +2,7 @@
 
 import { customEcMinSize, type Scheme, type Tunables } from './ceph'
 import { effectiveProfileName, effectiveRuleName, type PoolOptions } from './pool'
+import type { ConfigSetting, RatioKey } from './recommendations'
 import type { DomainType } from './topology'
 
 export interface CommandLine {
@@ -24,12 +25,26 @@ export interface CommandInput {
   tunables: Tunables
   /** Include cluster-wide ratio commands (they affect every pool). */
   includeClusterRatios: boolean
+  /** Ratios from applied recommendations; emitted even without the other cluster-wide ratios. */
+  ratioOverrides?: Partial<Record<RatioKey, number>>
+  /** `ceph config set global` options from applied recommendations. */
+  configSettings?: ConfigSetting[]
 }
 
 /** Starting pg_num when the autoscaler manages the pool (Ceph's osd_pool_default_pg_num). */
 export const AUTOSCALE_START_PG = 32
 
 const ratio = (r: number) => r.toFixed(2)
+
+/** `ceph config set global <option> <value>` */
+export function configCommand(option: string, value: string): string {
+  return `ceph config set global ${option} ${value}`
+}
+
+/** `ceph osd set-nearfull-ratio 0.85` and the like. */
+export function ratioCommand(key: RatioKey, value: number): string {
+  return `ceph osd set-${key}-ratio ${ratio(value)}`
+}
 
 /** Decimal TB to an exact byte count string (1 TB = 10^12 bytes). */
 export function tbToBytes(tb: number): string {
@@ -52,16 +67,35 @@ export function buildCommands(input: CommandInput): CommandSection[] {
   const sections: CommandSection[] = []
   const set = (key: string, value: string | number | boolean) => cmd(`ceph osd pool set ${name} ${key} ${value}`)
 
-  if (input.includeClusterRatios) {
+  const planned: Record<RatioKey, number> = {
+    nearfull: tunables.nearfullRatio,
+    backfillfull: tunables.backfillfullRatio,
+    full: tunables.fullRatio,
+  }
+  const overrides = input.ratioOverrides ?? {}
+  const ratioLines = (['nearfull', 'backfillfull', 'full'] as const)
+    .filter((key) => input.includeClusterRatios || overrides[key] !== undefined)
+    .map((key) => {
+      const value = overrides[key]
+      return value === undefined
+        ? cmd(ratioCommand(key, planned[key]))
+        : { ...cmd(ratioCommand(key, value)), note: `recommended (planning value ${ratio(planned[key])})` }
+    })
+  if (ratioLines.length) {
     sections.push({
       id: 'ratios',
       title: 'Cluster-wide fill ratios',
       note: 'These apply to every pool in the cluster.',
-      lines: [
-        cmd(`ceph osd set-nearfull-ratio ${ratio(tunables.nearfullRatio)}`),
-        cmd(`ceph osd set-backfillfull-ratio ${ratio(tunables.backfillfullRatio)}`),
-        cmd(`ceph osd set-full-ratio ${ratio(tunables.fullRatio)}`),
-      ],
+      lines: ratioLines,
+    })
+  }
+
+  if (input.configSettings?.length) {
+    sections.push({
+      id: 'recommended',
+      title: 'Recommended settings',
+      note: 'From the Recommendations panel; they apply to the whole cluster.',
+      lines: input.configSettings.map((s) => cmd(configCommand(s.option, s.value))),
     })
   }
 
@@ -112,7 +146,7 @@ export function buildCommands(input: CommandInput): CommandSection[] {
       id: 'redundancy',
       title: 'Redundancy',
       lines: [
-        { parts: ['ceph config set global mon_allow_pool_size_one true'], note: 'single-copy pools are blocked by default' },
+        { parts: [configCommand('mon_allow_pool_size_one', 'true')], note: 'single-copy pools are blocked by default' },
         cmd(`ceph osd pool set ${name} size 1 --yes-i-really-mean-it`),
         set('min_size', scheme.minSize),
       ],

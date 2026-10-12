@@ -42,6 +42,7 @@ src/
     urlState.ts           AppState <-> compact JSON in the URL hash (#s=…), defaults, untrusted-input checks
     format.ts / units.ts  number formatting; TB/TiB display unit (formatCapacity)
     pricing.ts            price per TB, cost per usable TB, formatPrice, CURRENCY_MAX_LENGTH
+    recommendations.ts    recommendations from the result (nearfull ratio for the recovery reserve), applied as overrides
     iops.ts               IOPS estimate: OSD ops per client op (opCosts), capacity-weighted OSD count, ceiling
     faq.ts                FAQ anchor ids + openFaq()
   styles/                 _tokens.scss (breakpoints, fonts, mixins), _themes.scss (colour tokens), main.scss
@@ -84,6 +85,40 @@ real net = placeable(domains − N largest) × nearfull × f
 - **First visit:** Replication 3x, recovery reserve 0, ratios 0.85 / 0.90 / 0.95, no price and no IOPS (step 5
   "Miscellaneous"; empty `NumberField`s with `blank-zero` mean "not set"). The currency starts as the browser
   locale's symbol (`localCurrency()` in `pricing.ts`).
+
+## Recommendations (`src/lib/recommendations.ts`)
+
+- **Pure functions:** `recommendations({ input, result, tunables, scheme, domain, hostInput })` returns a list
+  (`hostInput`: the same topology spread across hosts, passed only while spreading across OSDs). The Recommendations
+  panel is rendered only when it isn't empty. The commands panel applies the switched-on ones (opt-in "Apply
+  recommendations" toggle, one toggle each, local state, not in links): `ratios` become `ratioOverrides`, `config`
+  entries become `ceph config set global …` lines in a "Recommended settings" section.
+- **Nearfull ratio:** with a recovery reserve, recommend `floor(healthyFill × 100) / 100` as Ceph's `nearfull_ratio`.
+  That is the healthy fill at the planned data, so Ceph warns when the plan is exceeded while a failure is still
+  recoverable below the planning nearfull. An applied override is emitted even without the other cluster-wide ratios.
+  Not offered when the layout tolerates no failure (size 1): nothing can be recovered.
+- **Single-copy pools (replication size 1):** `mon_allow_pool_size_one true` is required and always in the commands;
+  the recommendation adds `mon_warn_on_pool_no_redundancy false` against the permanent `HEALTH_WARN`.
+- **Distribution bar:** `DistributionBar.vue` draws the raw data distribution with its ratio markers. The result card
+  (`CapacityBar.vue`, which adds the legend) and the recommendations (with a 30 % larger `recommended` marker via
+  `recommendedNearfull`) both use it; change the bar only there, so both stay identical.
+- **Two kinds:** *applied* recommendations change the generated commands (`ratios`, `config`; `isApplicable()`), and
+  only these get toggles in the commands panel. *Adopted* ones change the calculator's inputs (`adopt.setup`, a
+  `SetupChange`). The panel's "Adopt recommendation" button emits it, `App.vue` applies it, and because the
+  recommendation's condition no longer holds it vanishes; the panel shows an "Adopted: …" note in its place that
+  fades out (`ADOPTED_MS`, matching the CSS animation). Current adopted kinds, each showing its cost in real net
+  capacity:
+  - recovery reserve 0 → 1 (only with a spare domain);
+  - replication size 1 → 3 (or 2 with only two domains);
+  - failure domain OSDs → hosts (with several hosts). It keeps the recovery reserve, or lowers it as far as needed
+    when there are too few hosts for it.
+- **Severity:** `critical` (red warning sign before the headline) only when the current setup risks data loss, e.g.
+  replication size 1; everything else is `info` (light bulb, the panel's colour).
+- **Collapsed by default:** each recommendation shows only its pictogram, headline, adopt button and chevron; the
+  headline (a button with `aria-expanded`) or the chevron expands the rest. The open state is local, not in links.
+- **New kinds:** add them to `recommendations()` with their own tests. Keep the texts in the `Recommendation` fields so
+  the panel stays generic. Settings a recommendation changes are `changes` ("parameter: from → to"), rendered by the
+  generic `SettingChange.vue` (not as KPI-like tiles, which show outcomes).
 
 ## IOPS estimate (`src/lib/iops.ts`)
 

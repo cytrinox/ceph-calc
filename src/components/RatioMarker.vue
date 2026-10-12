@@ -1,5 +1,5 @@
 <script setup lang="ts">
-export type RatioKind = 'nearfull' | 'backfillfull' | 'full'
+export type RatioKind = 'nearfull' | 'backfillfull' | 'full' | 'recommended'
 
 withDefaults(defineProps<{ kind: RatioKind; size?: number }>(), { size: 12 })
 </script>
@@ -34,5 +34,10 @@ withDefaults(defineProps<{ kind: RatioKind; size?: number }>(), { size: 12 })
 
 .full {
   color: var(--marker-full);
+}
+
+// A recommended ratio (see the Recommendations panel).
+.recommended {
+  color: var(--accent-text);
 }
 </style>
