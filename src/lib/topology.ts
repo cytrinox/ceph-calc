@@ -311,9 +311,9 @@ export function filterDeviceClass(topology: Topology, deviceClass: string): Topo
   return topology.map(keep).filter((b): b is Bucket => b !== null)
 }
 
-export type DeviceClassUsage = Record<string, { osds: number; tb: number }>
+export type DeviceClassUsage = Record<string, { osds: number; tb: number; largestTB: number }>
 
-/** OSDs and raw capacity per device class used in the tree (bucket counts applied). */
+/** OSDs, raw capacity and the largest OSD per device class used in the tree (bucket counts applied). */
 export function deviceClassUsage(topology: Topology): DeviceClassUsage {
   const usage: DeviceClassUsage = {}
   const visit = (b: Bucket, parentMult: number) => {
@@ -321,9 +321,10 @@ export function deviceClassUsage(topology: Topology): DeviceClassUsage {
     if (mult === 0) return
     // Only hosts hold OSDs (a bucket changed from host to another type keeps its groups, unused).
     for (const o of b.type === 'host' ? b.osds : []) {
-      const u = (usage[o.deviceClass] ??= { osds: 0, tb: 0 })
+      const u = (usage[o.deviceClass] ??= { osds: 0, tb: 0, largestTB: 0 })
       u.osds += mult * int(o.count)
       u.tb += mult * int(o.count) * num(o.sizeTB)
+      if (int(o.count) > 0) u.largestTB = Math.max(u.largestTB, num(o.sizeTB))
     }
     for (const c of b.children) visit(c, mult)
   }

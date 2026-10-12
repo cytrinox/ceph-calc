@@ -38,9 +38,10 @@ Source: <https://github.com/cytrinox/ceph-calc>
   compression ratio, default 0.90, shown as an effective-capacity badge), quotas, and the `nodelete` /
   `nosizechange` flags. Leave the rule or profile name empty to get a derived name such as `rep3_host`
   or `ec-4-2-rack-nvme`.
-- IOPS (also step 5, optional): a client I/O size (4K–1M) and the random read and write IOPS of one OSD at that
-  size give an estimated cluster ceiling for the selected layout (result card, with the arithmetic in the
-  tooltip) and for every preset (comparison table).
+- IOPS (also step 5, optional): a client I/O size (4K–1M) and, in one tab per device class of the
+  hardware (custom classes included), the random read and write IOPS of one OSD at that size give an estimated
+  cluster ceiling for the selected layout (result card, with the arithmetic in the tooltip) and for every preset
+  (comparison table).
 - Raw data distribution bar: usable data, protection overhead, reserved headroom (kept free on purpose) and,
   when there is any, unusable space (yellow; can never be filled), with markers where a healthy cluster
   reaches the nearfull, backfillfull and full ratios. Below the usable share, `+X until backfillfull` /
@@ -119,7 +120,10 @@ OSD operations per client operation, with `d = min(k, ⌈I/O size ÷ stripe_unit
 
 With `R` / `W` the per-OSD read / write IOPS at the I/O size, `N_eff = placed capacity ÷ largest OSD` (CRUSH spreads I/O by
 capacity, so the largest OSDs saturate first; equal OSDs give the OSD count) and `IOPS = N_eff ÷ (reads ÷ R +
-writes ÷ W)`. It is a ceiling for a healthy cluster with many parallel requests; network, CPU, latency, recovery
+writes ÷ W)`. With several device classes in the pool (a rule for any class), CRUSH spreads the I/O by capacity
+over all of them and each class's largest OSD saturates at its own rate: `IOPS = min over classes c of N_eff,c ÷
+(reads ÷ R_c + writes ÷ W_c)` with `N_eff,c = placed capacity ÷ largest OSD of class c`, so the slowest class limits
+the pool. A rule restricted to one class uses only its OSDs and values. It is a ceiling for a healthy cluster with many parallel requests; network, CPU, latency, recovery
 and scrubbing are not modelled.
 
 ## Development

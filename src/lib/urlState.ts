@@ -14,7 +14,7 @@ import {
 } from './pool'
 import { customEcMinSize, DEFAULT_RATIOS, defaultEcMinSize, type Scheme } from './ceph'
 import { CURRENCY_MAX_LENGTH, DEFAULT_PRICE_PER_TB, localCurrency } from './pricing'
-import { DEFAULT_IO_SIZE_KIB, IO_SIZES_KIB, MAX_OSD_IOPS } from './iops'
+import { DEFAULT_IO_SIZE_KIB, IO_SIZES_KIB, MAX_OSD_IOPS, type OsdIops } from './iops'
 import {
   ALL_DOMAIN_TYPES,
   BUCKET_TYPES,
@@ -47,9 +47,8 @@ export interface AppState {
   pricePerTB: number
   /** Free-text currency (EUR, $, USD, …). */
   currency: string
-  /** Random IOPS one OSD sustains at the client I/O size (0 = not set, no IOPS estimate). */
-  osdReadIops: number
-  osdWriteIops: number
+  /** Random IOPS one OSD of each device class sustains at the client I/O size (missing = not set). */
+  osdIops: Record<string, OsdIops>
   /** Client I/O size of the IOPS estimate, in KiB. */
   ioSizeKiB: number
   /** Show the virtual CRUSH map (`ceph osd crush tree`) of the hardware. */
@@ -70,8 +69,7 @@ export function defaultState(): AppState {
     pool: defaultPoolOptions(),
     pricePerTB: DEFAULT_PRICE_PER_TB,
     currency: localCurrency(),
-    osdReadIops: 0,
-    osdWriteIops: 0,
+    osdIops: {},
     ioSizeKiB: DEFAULT_IO_SIZE_KIB,
     crushMap: false,
   }
@@ -97,13 +95,33 @@ interface Packed {
   /** Price per TB. */
   pt?: number
   cu?: string
-  /** Read and write IOPS per OSD and the I/O size in KiB; left out when not set. */
-  io?: [number, number, number]
+  /** I/O size in KiB and per device class the read and write IOPS per OSD; left out when not set. */
+  io?: [number, Record<string, [number, number]>]
   /** 1 = show the virtual CRUSH map; left out when off. */
   cm?: 1
 }
 
 const iops = (value: unknown) => Math.min(MAX_OSD_IOPS, int(value))
+
+/** Only classes with a value; nothing at all while no IOPS are set and the I/O size is the default. */
+function packIops(state: AppState): Pick<Packed, 'io'> {
+  const classes = Object.entries(state.osdIops)
+    .filter(([cls, o]) => isValidDeviceClass(cls) && (iops(o.read) > 0 || iops(o.write) > 0))
+    .map(([cls, o]): [string, [number, number]] => [cls, [iops(o.read), iops(o.write)]])
+  if (classes.length === 0 && state.ioSizeKiB === DEFAULT_IO_SIZE_KIB) return {}
+  return { io: [ioSize(state.ioSizeKiB), Object.fromEntries(classes)] }
+}
+
+function unpackIops(raw: unknown): Record<string, OsdIops> {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
+  const result: Record<string, OsdIops> = {}
+  for (const [cls, value] of Object.entries(raw)) {
+    if (!isValidDeviceClass(cls) || !Array.isArray(value)) continue
+    const osd = { read: iops(value[0]), write: iops(value[1]) }
+    if (osd.read > 0 || osd.write > 0) result[cls] = osd
+  }
+  return result
+}
 
 function ecPacked(scheme: Extract<Scheme, { kind: 'ec' }>): Packed['s'] {
   const minSize = customEcMinSize(scheme)
@@ -247,9 +265,7 @@ export function encodeState(state: AppState): string {
     p: state.pool,
     pt: num(state.pricePerTB),
     cu: state.currency,
-    ...(state.osdReadIops > 0 || state.osdWriteIops > 0 || state.ioSizeKiB !== DEFAULT_IO_SIZE_KIB
-      ? { io: [iops(state.osdReadIops), iops(state.osdWriteIops), ioSize(state.ioSizeKiB)] as [number, number, number] }
-      : {}),
+    ...packIops(state),
     ...(state.crushMap ? { cm: 1 as const } : {}),
   }
   if (state.advanced) packed.a = state.advanced.map(packBucket)
@@ -283,9 +299,8 @@ export function decodeState(data: string): AppState | null {
     if (typeof p.pt === 'number' && Number.isFinite(p.pt)) state.pricePerTB = Math.max(0, p.pt)
     if (typeof p.cu === 'string') state.currency = p.cu.slice(0, CURRENCY_MAX_LENGTH)
     if (Array.isArray(p.io)) {
-      state.osdReadIops = iops(p.io[0])
-      state.osdWriteIops = iops(p.io[1])
-      state.ioSizeKiB = ioSize(p.io[2])
+      state.ioSizeKiB = ioSize(p.io[0])
+      state.osdIops = unpackIops(p.io[1])
     }
     state.crushMap = p.cm === 1
     return state

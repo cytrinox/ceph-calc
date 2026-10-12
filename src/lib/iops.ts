@@ -2,7 +2,7 @@
 // OSD sustains at that size.
 
 import type { Scheme } from './ceph'
-import { formatInt } from './format'
+import { formatInt, formatTB } from './format'
 import type { PoolOptions } from './pool'
 
 /** Upper bound for the per-OSD inputs (also used for shared links). */
@@ -89,21 +89,55 @@ export function clusterIops(equivalents: number, cost: OpCost, osd: OsdIops): nu
   return busy > 0 ? equivalents / busy : null
 }
 
-/** What the estimate is based on; null when no per-OSD IOPS are set. */
-export interface IopsBasis {
+/** One device class among the OSDs the pool uses. */
+export interface ClassIops {
+  cls: string
+  /** Per-OSD IOPS of this class (step 5). */
   osd: OsdIops
+  /** Capacity of the class's largest OSD: it gets the most I/O of the class and saturates first. */
+  largestOsdTB: number
+  /** All placed capacity ÷ `largestOsdTB`: the capacity-weighted OSD count relative to that OSD. */
   equivalents: number
+}
+
+/** What the estimate is based on; null when no per-OSD IOPS are set at all. */
+export interface IopsBasis {
+  classes: ClassIops[]
+  /** Capacity of the OSDs the pool uses (all its classes). */
+  placedTB: number
   ioSizeKiB: number
 }
 
+export const hasIops = (osd: OsdIops) => osd.read > 0 || osd.write > 0
+
+/**
+ * The basis of the estimate: the device classes of the OSDs the pool uses, each with its per-OSD IOPS and its
+ * largest OSD. Null while no IOPS are `entered` (for any class, also those the pool doesn't use): the estimate is
+ * opt-in.
+ */
 export function iopsBasis(
-  osd: OsdIops,
+  classes: { cls: string; osd: OsdIops; largestOsdTB: number }[],
   placedTB: number,
-  largestOsdTB: number,
   ioSizeKiB: number = DEFAULT_IO_SIZE_KIB,
+  entered: boolean = classes.some((c) => hasIops(c.osd)),
 ): IopsBasis | null {
-  if (!(osd.read > 0) && !(osd.write > 0)) return null
-  return { osd, equivalents: osdEquivalents(placedTB, largestOsdTB), ioSizeKiB }
+  if (!entered || classes.length === 0) return null
+  return {
+    classes: classes.map((c) => ({ ...c, equivalents: osdEquivalents(placedTB, c.largestOsdTB) })),
+    placedTB,
+    ioSizeKiB,
+  }
+}
+
+export interface OpEstimate {
+  /** Client IOPS when the first OSDs saturate; null when an input is missing. */
+  value: number | null
+  /** The class whose OSDs saturate first. */
+  limiting: ClassIops | null
+  /** The ceiling each class alone would allow. */
+  perClass: { cls: string; value: number | null }[]
+  /** Classes without the per-OSD IOPS this operation needs. */
+  missing: string[]
 }
 
 export interface IopsEstimate {
@@ -111,16 +145,35 @@ export interface IopsEstimate {
   write: number | null
   costs: OpCosts
   basis: IopsBasis
+  ops: { read: OpEstimate; write: OpEstimate }
+}
+
+/**
+ * CRUSH spreads the OSD operations by capacity over all OSDs the pool uses, whatever their class. Each class's
+ * largest OSD saturates at its own rate, so the pool's ceiling is the lowest of the classes' ceilings.
+ */
+function estimateOp(basis: IopsBasis, cost: OpCost): OpEstimate {
+  const perClass = basis.classes.map((c) => ({ c, value: clusterIops(c.equivalents, cost, c.osd) }))
+  const missing = basis.classes
+    .filter((c) => (cost.reads > 0 && !(c.osd.read > 0)) || (cost.writes > 0 && !(c.osd.write > 0)))
+    .map((c) => c.cls)
+  const known = perClass.filter((p): p is { c: ClassIops; value: number } => p.value !== null)
+  const lowest = known.length === perClass.length && known.length > 0
+    ? known.reduce((a, b) => (b.value < a.value ? b : a))
+    : null
+  return {
+    value: lowest?.value ?? null,
+    limiting: lowest?.c ?? null,
+    perClass: perClass.map((p) => ({ cls: p.c.cls, value: p.value })),
+    missing,
+  }
 }
 
 export function estimateIops(basis: IopsBasis, scheme: Scheme, pool: IopsPoolOptions): IopsEstimate {
   const costs = opCosts(scheme, pool, basis.ioSizeKiB)
-  return {
-    read: clusterIops(basis.equivalents, costs.read, basis.osd),
-    write: clusterIops(basis.equivalents, costs.write, basis.osd),
-    costs,
-    basis,
-  }
+  const read = estimateOp(basis, costs.read)
+  const write = estimateOp(basis, costs.write)
+  return { read: read.value, write: write.value, costs, basis, ops: { read, write } }
 }
 
 const count = (n: number, word: string) => `${n} ${word}${n === 1 ? '' : 's'}`
@@ -141,17 +194,28 @@ function osdCount(equivalents: number): string {
 
 /**
  * The arithmetic behind one estimate, e.g. "8 OSDs × 100 IOPS ÷ 1 OSD read = 800" or
- * "8 OSDs ÷ (4 reads ÷ 100 + 6 writes ÷ 100 IOPS) = 80"; null when there is no value.
+ * "8 OSDs ÷ (4 reads ÷ 100 + 6 writes ÷ 100 IOPS) = 80"; null when there is no value. With several device
+ * classes it names the class that saturates first, its capacity-weighted count as "448 TB ÷ 16 TB", and the
+ * ceilings of the others.
  */
 export function explainIops(estimate: IopsEstimate, op: 'read' | 'write'): string | null {
-  const value = estimate[op]
-  if (value === null) return null
+  const { value, limiting, perClass } = estimate.ops[op]
+  if (value === null || !limiting) return null
   const cost = estimate.costs[op]
-  const { osd, equivalents } = estimate.basis
+  const { osd, equivalents } = limiting
+  const several = estimate.basis.classes.length > 1
+  const osds = several
+    ? `(${formatTB(estimate.basis.placedTB)} ÷ ${formatTB(limiting.largestOsdTB)})`
+    : osdCount(equivalents)
   const result = formatInt(Math.round(value))
-  if (cost.reads > 0 && cost.writes > 0) {
-    return `${osdCount(equivalents)} ÷ (${count(cost.reads, 'read')} ÷ ${formatInt(osd.read)} + ${count(cost.writes, 'write')} ÷ ${formatInt(osd.write)} IOPS) = ${result}`
-  }
-  const perOsd = cost.reads > 0 ? osd.read : osd.write
-  return `${osdCount(equivalents)} × ${formatInt(perOsd)} IOPS ÷ ${describeCost(cost)} = ${result}`
+  const sum =
+    cost.reads > 0 && cost.writes > 0
+      ? `${osds} ÷ (${count(cost.reads, 'read')} ÷ ${formatInt(osd.read)} + ${count(cost.writes, 'write')} ÷ ${formatInt(osd.write)} IOPS) = ${result}`
+      : `${osds} × ${formatInt(cost.reads > 0 ? osd.read : osd.write)} IOPS ÷ ${describeCost(cost)} = ${result}`
+  if (!several) return sum
+  const others = perClass
+    .filter((p) => p.cls !== limiting.cls)
+    .map((p) => `${p.cls}: ${p.value === null ? '—' : formatInt(Math.round(p.value))}`)
+    .join(', ')
+  return `${limiting.cls} OSDs saturate first: ${sum} (${others})`
 }

@@ -185,8 +185,9 @@ import { FAQ_IDS } from '@/lib/faq'
         </summary>
         <div class="answer">
           <p>
-            From the random read and write IOPS of a single OSD at the chosen client I/O size (step 5), the calculator
-            estimates how many client operations per second the pool handles before its busiest OSDs are saturated.
+            From the random read and write IOPS of a single OSD of each device class at the chosen client I/O size
+            (step 5), the calculator estimates how many client operations per second the pool handles before its
+            busiest OSDs are saturated.
             Each client operation costs OSD operations, depending on the pool layout:
           </p>
           <table class="costs">
@@ -253,6 +254,20 @@ IOPS  = N_eff ÷ (reads ÷ R + writes ÷ W)</pre>
             </dd>
           </dl>
 
+          <p class="example-title">Mixed device classes</p>
+          <p>
+            A CRUSH rule restricted to a device class (step 4) uses only those OSDs and their IOPS. A rule for any
+            device class spreads the data, and with it the I/O, by capacity over all classes, so each class's largest
+            OSD saturates at its own rate. The pool reaches its ceiling when the first class does:
+          </p>
+          <pre class="formula">IOPS = min over classes c of N_eff,c ÷ (reads ÷ R_c + writes ÷ W_c)
+N_eff,c = capacity of all OSDs ÷ capacity of the largest OSD of class c</pre>
+          <p>
+            Slow OSDs therefore limit the whole pool: with 24 × 8 TB ssd and 16 × 16 TB hdd OSDs at 200 hdd read
+            IOPS, replication reaches 448 TB ÷ 16 TB × 200 = 5,600 read IOPS, however fast the ssds are. Every class
+            the pool uses needs its values; until then the estimate shows “—”.
+          </p>
+
           <p class="example-title">Example: 12 OSDs, each 200 read and 200 write IOPS at 4K</p>
           <table class="example">
             <tbody>
@@ -277,7 +292,7 @@ IOPS  = N_eff ÷ (reads ÷ R + writes ÷ W)</pre>
           <p class="example-title">Assumptions</p>
           <ul>
             <li>
-              the per-OSD IOPS are measured on an OSD at the chosen I/O size (e.g. fio, or
+              the per-OSD IOPS are measured on an OSD of each class at the chosen I/O size (e.g. fio, or
               <code>ceph tell osd.N bench</code> for writes), so BlueStore overhead is included;
             </li>
             <li>

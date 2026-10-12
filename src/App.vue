@@ -11,7 +11,7 @@ import ShareButton from './components/ShareButton.vue'
 import ThemeToggle from './components/ThemeToggle.vue'
 import UnitToggle from './components/UnitToggle.vue'
 import { computeCapacity, emptyDomainsWarning, placementMessage, ratiosOrdered, schemeMinSize, type Scheme } from './lib/ceph'
-import { CRUSH_WEIGHT_MAX, crushWeightOverflow } from './lib/crushTree'
+import { CRUSH_WEIGHT_MAX, crushWeightOverflow, treeClasses } from './lib/crushTree'
 import { formatInt, formatPct, formatTB } from './lib/format'
 import { formatCapacity } from './lib/units'
 import { clusterPrice, formatPrice, pricePerUsableTB } from './lib/pricing'
@@ -35,7 +35,7 @@ import {
 } from './lib/topology'
 import { defaultState, readStateFromUrl, writeStateToUrl, type AppState } from './lib/urlState'
 import { channelTitle, versionLink } from './lib/version'
-import { estimateIops, iopsBasis } from './lib/iops'
+import { estimateIops, hasIops, iopsBasis } from './lib/iops'
 import { recommendations, type SetupChange } from './lib/recommendations'
 
 // Same calculator pictogram as the favicon (served from public/).
@@ -62,16 +62,13 @@ function resetFromBasic() {
   state.advanced = seedFromBasic()
 }
 
-const topology = computed(() =>
-  state.tab === 'basic' ? buildBasicTopology(state.basic) : (state.advanced ?? []),
-)
+// Basic OSDs get the rule's device class (ssd for any), as when they seed the Advanced tab: they always match it.
+const topology = computed(() => (state.tab === 'basic' ? seedFromBasic() : (state.advanced ?? [])))
 
 const stats = computed(() => topologyStats(topology.value))
 
-// The hardware as Ceph would list it: Basic OSDs get the rule's device class, as when they seed the Advanced tab.
-const crushTopology = computed(() => (state.tab === 'basic' ? seedFromBasic() : topology.value))
 // Set when a CRUSH bucket would exceed its weight limit with Ceph's default weights (TiB).
-const crushOverflow = computed(() => crushWeightOverflow(crushTopology.value))
+const crushOverflow = computed(() => crushWeightOverflow(topology.value))
 
 // A CRUSH rule restricted to a device class only uses those OSDs (Advanced tab; Basic OSDs always match).
 const ruleClass = computed(() => (state.tab === 'advanced' ? state.pool.deviceClass : ''))
@@ -110,15 +107,18 @@ const tunables = computed(() => ({
 }))
 const result = computed(() => computeCapacity(input.value, state.scheme, tunables.value))
 
-// IOPS estimate (opt-in): per-OSD IOPS weighted by the OSDs the rule can use.
-const iops = computed(() =>
-  iopsBasis(
-    { read: num(state.osdReadIops), write: num(state.osdWriteIops) },
-    poolStats.value.rawTB - domains.value.unplacedTB,
-    poolStats.value.largestOsdTB,
-    state.ioSizeKiB,
-  ),
-)
+// IOPS estimate (opt-in): per device class of the OSDs the rule uses, its per-OSD IOPS and its largest OSD.
+// Step 5 has a tab for every class in the tree.
+const iopsClasses = computed(() => treeClasses(topology.value))
+const iopsOf = (cls: string) => ({ read: num(state.osdIops[cls]?.read), write: num(state.osdIops[cls]?.write) })
+const iops = computed(() => {
+  const usage = deviceClassUsage(poolTopology.value)
+  const classes = sortDeviceClasses(Object.keys(usage))
+    .filter((cls) => usage[cls].osds > 0)
+    .map((cls) => ({ cls, osd: iopsOf(cls), largestOsdTB: usage[cls].largestTB }))
+  const entered = iopsClasses.value.some((cls) => hasIops(iopsOf(cls)))
+  return iopsBasis(classes, poolStats.value.rawTB - domains.value.unplacedTB, state.ioSizeKiB, entered)
+})
 const iopsEstimate = computed(() => (iops.value ? estimateIops(iops.value, state.scheme, state.pool) : null))
 
 const facts = computed(() => {
@@ -321,6 +321,7 @@ watch(
         :osd-count="stats.counts.osd"
         :pool-osd-count="poolStats.counts.osd"
         :tree-classes="Object.keys(classUsage)"
+        :iops-classes="iopsClasses"
         :domain-count="result.domainCount"
         :width="result.width"
         @reset-from-basic="resetFromBasic"
@@ -346,7 +347,7 @@ watch(
           :pool="state.pool"
           @select="selectScheme"
         />
-        <CrushTreePanel v-if="state.crushMap" :topology="crushTopology" />
+        <CrushTreePanel v-if="state.crushMap" :topology="topology" />
         <RecommendationsPanel :recommendations="recommendationList" :result="result" @adopt="adoptRecommendation" />
         <CommandsPanel
           :pool="state.pool"

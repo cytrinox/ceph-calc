@@ -14,9 +14,9 @@ import ToggleField from './ToggleField.vue'
 import { DEFAULT_RATIOS, defaultEcMinSize, linkRatios, ratiosOrdered, schemeMinSize, type FillRatios } from '@/lib/ceph'
 import { CUSTOM_EC, CUSTOM_REPLICATED, DEFAULT_PRESET_ID, PRESETS, schemeLabel, schemeSelection } from '@/lib/schemes'
 import { formatInt, formatIops } from '@/lib/format'
-import { IO_SIZES_KIB, MAX_OSD_IOPS, ioSizeLabel } from '@/lib/iops'
+import { IO_SIZES_KIB, MAX_OSD_IOPS, ioSizeLabel, type OsdIops } from '@/lib/iops'
 import { CURRENCY_MAX_LENGTH, formatPrice } from '@/lib/pricing'
-import { TYPE_ID, plural, type DomainType, type TopologyExample } from '@/lib/topology'
+import { DEFAULT_OSD_CLASS, TYPE_ID, plural, type DomainType, type TopologyExample } from '@/lib/topology'
 import type { AppState, TopologyTab } from '@/lib/urlState'
 
 const props = defineProps<{
@@ -27,6 +27,8 @@ const props = defineProps<{
   poolOsdCount: number
   /** Device classes used in the Advanced tree. */
   treeClasses: string[]
+  /** Device classes of the hardware (Basic: the rule's class or ssd): one IOPS tab each. */
+  iopsClasses: string[]
   /** Failure domains in the topology. */
   domainCount: number
   /** Copies / shards per object. */
@@ -142,13 +144,48 @@ const poolSummary = computed(() => {
 })
 const miscSummary = computed(() => {
   const st = props.state
-  const { osdReadIops: r, osdWriteIops: w } = st
   const value = (n: number) => (n > 0 ? formatIops(n) : '—')
   const price = st.pricePerTB > 0 ? `${formatPrice(st.pricePerTB, st.currency)}/TB` : 'no price'
-  const iops =
-    r > 0 || w > 0 ? `${ioSizeLabel(st.ioSizeKiB)} · read ${value(r)} · write ${value(w)} IOPS per OSD` : 'no IOPS'
+  const set = props.iopsClasses.filter((cls) => st.osdIops[cls])
+  const iops = set.length
+    ? `${ioSizeLabel(st.ioSizeKiB)} · ${set.map((cls) => `${cls} ${value(st.osdIops[cls].read)} / ${value(st.osdIops[cls].write)}`).join(' · ')} IOPS per OSD`
+    : 'no IOPS'
   return [price, iops, ...(st.crushMap ? ['CRUSH map'] : [])].join(' · ')
 })
+
+// Per-OSD IOPS, one tab per device class. A class without values has no entry, so links stay short.
+const iopsTab = ref('')
+const iopsClass = computed({
+  get: () => (props.iopsClasses.includes(iopsTab.value) ? iopsTab.value : (props.iopsClasses[0] ?? DEFAULT_OSD_CLASS)),
+  set: (cls: string) => (iopsTab.value = cls),
+})
+const iopsTabs = computed(() =>
+  props.iopsClasses.map((cls) => {
+    const osd = props.state.osdIops[cls]
+    const value = (n: number) => (n > 0 ? formatIops(n) : '—')
+    return { value: cls, label: cls, hint: osd ? `${value(osd.read)} / ${value(osd.write)}` : 'not set' }
+  }),
+)
+// The rule only uses its class (Advanced tab); the other tabs don't count for this pool.
+const iopsClassUnused = computed(() => {
+  const rule = props.state.tab === 'advanced' ? props.state.pool.deviceClass : ''
+  return rule !== '' && iopsClass.value !== rule ? rule : null
+})
+
+function iopsField(op: keyof OsdIops) {
+  return computed({
+    get: () => props.state.osdIops[iopsClass.value]?.[op] ?? 0,
+    set: (value: number) => {
+      const cls = iopsClass.value
+      const current = props.state.osdIops[cls] ?? { read: 0, write: 0 }
+      const next = { ...current, [op]: value }
+      if (next.read > 0 || next.write > 0) props.state.osdIops[cls] = next
+      else delete props.state.osdIops[cls]
+    },
+  })
+}
+const readIops = iopsField('read')
+const writeIops = iopsField('write')
 
 /** Failure domains beyond what one object needs: the most the recovery reserve can cover. */
 const spareDomains = computed(() => props.domainCount - props.width)
@@ -163,7 +200,7 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
     </div>
 
     <StepSection :num="1" title="Hardware" subtitle="Hosts and drives that make up the cluster" :summary="hardwareSummary">
-      <TabGroup v-model="state.tab" :tabs="tabs" label="Topology mode" />
+      <TabGroup v-model="state.tab" class="topology-tabs" :tabs="tabs" label="Topology mode" />
       <BasicTopology v-if="state.tab === 'basic'" :topology="state.basic" />
       <AdvancedTopology
         v-else-if="state.advanced"
@@ -355,10 +392,15 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
           </select>
           <span class="hint">Size of each client request; enter the per-OSD IOPS for this size</span>
         </label>
+        <TabGroup v-model="iopsClass" :tabs="iopsTabs" label="Device class" />
+        <p v-if="iopsClassUnused" class="unused">
+          The CRUSH rule only uses {{ iopsClassUnused }} OSDs (step 4): these values don't count for this pool.
+        </p>
         <NumberField
-          v-model="state.osdReadIops"
+          :key="`${iopsClass}-read`"
+          v-model="readIops"
           label="Read IOPS"
-          :hint="`${ioSizeLabel(state.ioSizeKiB)} random reads one OSD sustains`"
+          :hint="`${ioSizeLabel(state.ioSizeKiB)} random reads one ${iopsClass} OSD sustains`"
           :min="0"
           :max="MAX_OSD_IOPS"
           :step="100"
@@ -369,9 +411,10 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
           </template>
         </NumberField>
         <NumberField
-          v-model="state.osdWriteIops"
+          :key="`${iopsClass}-write`"
+          v-model="writeIops"
           label="Write IOPS"
-          :hint="`${ioSizeLabel(state.ioSizeKiB)} random writes one OSD sustains`"
+          :hint="`${ioSizeLabel(state.ioSizeKiB)} random writes one ${iopsClass} OSD sustains`"
           :min="0"
           :max="MAX_OSD_IOPS"
           :step="100"
@@ -380,8 +423,8 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
         <p class="measure">
           Measure on the OSD itself with this block size (e.g. fio with
           <code>bs={{ ioSizeLabel(state.ioSizeKiB).toLowerCase() }}</code> against an OSD, or
-          <code>ceph tell osd.N bench</code> for writes), so BlueStore overhead is included. Leave both empty to hide the
-          estimate.
+          <code>ceph tell osd.N bench</code> for writes), so BlueStore overhead is included. Each device class has its
+          own values. Leave them all empty to hide the estimate.
         </p>
       </div>
 
@@ -402,7 +445,8 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
   padding-bottom: 0.4rem;
 }
 
-.tabs {
+// Basic / Advanced (step 1); the IOPS class tabs sit in a grid with its own gaps.
+.topology-tabs {
   margin-bottom: 1rem;
 }
 
@@ -521,6 +565,13 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
   gap: 0.8rem;
   padding-top: 0.9rem;
   border-top: 1px dashed var(--border-strong);
+}
+
+// A tab whose class the pool's CRUSH rule doesn't use.
+.unused {
+  margin: 0;
+  font-size: 0.78rem;
+  color: var(--warning);
 }
 
 .measure {

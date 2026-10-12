@@ -1,13 +1,17 @@
 import { describe, expect, it } from 'vitest'
-import { clusterIops, describeCost, estimateIops, explainIops, iopsBasis, opCosts, osdEquivalents } from './iops'
+import { clusterIops, describeCost, estimateIops, explainIops, iopsBasis, opCosts, osdEquivalents, type OsdIops } from './iops'
 import { defaultPoolOptions } from './pool'
-import { buildBasicTopology, topologyStats, TOPOLOGY_EXAMPLES } from './topology'
+import { buildBasicTopology, deviceClassUsage, newBucket, newOsdGroup, topologyStats, TOPOLOGY_EXAMPLES } from './topology'
 import type { Scheme } from './ceph'
 
 const rep3: Scheme = { kind: 'replicated', size: 3, minSize: 2 }
 const ec = (k: number, m: number): Scheme => ({ kind: 'ec', k, m })
 const classic = defaultPoolOptions()
 const optimized = { ...classic, ecOptimizations: true }
+
+/** One device class: all OSDs alike in their IOPS. */
+const one = (osd: OsdIops, placedTB: number, largestOsdTB: number, ioSizeKiB?: number) =>
+  iopsBasis([{ cls: 'ssd', osd, largestOsdTB }], placedTB, ioSizeKiB)
 
 describe('opCosts', () => {
   it('counts OSD operations per client read and write', () => {
@@ -55,17 +59,17 @@ describe('opCosts with a client I/O size', () => {
   })
 
   it('makes stripe_unit matter for 16K writes on 8 OSDs at 100 IOPS', () => {
-    const basis = iopsBasis({ read: 100, write: 100 }, 8, 1, 16)!
+    const basis = one({ read: 100, write: 100 }, 8, 1, 16)!
     expect(estimateIops(basis, ec(4, 2), su(4)).write).toBeCloseTo(800 / 6, 9) // whole stripe
     expect(estimateIops(basis, ec(4, 2), su(16)).write).toBe(80) // read-modify-write
   })
 })
 
 describe('cluster IOPS', () => {
-  const basis = iopsBasis({ read: 200, write: 200 }, 12 * 8, 8)!
+  const basis = one({ read: 200, write: 200 }, 12 * 8, 8)!
 
   it('matches the FAQ example: 12 OSDs at 200 IOPS', () => {
-    expect(basis.equivalents).toBe(12)
+    expect(basis.classes[0].equivalents).toBe(12)
     const rep = estimateIops(basis, rep3, classic)
     expect([rep.read, rep.write]).toEqual([2400, 800])
     const ecClassic = estimateIops(basis, ec(4, 2), classic)
@@ -79,16 +83,16 @@ describe('cluster IOPS', () => {
     const stats = topologyStats(mixed)
     expect(stats.largestOsdTB).toBe(16)
     expect(osdEquivalents(stats.rawTB, stats.largestOsdTB)).toBe(42)
-    const r = estimateIops(iopsBasis({ read: 200, write: 200 }, stats.rawTB, stats.largestOsdTB)!, rep3, classic)
+    const r = estimateIops(one({ read: 200, write: 200 }, stats.rawTB, stats.largestOsdTB)!, rep3, classic)
     expect([r.read, r.write]).toEqual([8400, 2800])
   })
 
   it('needs the inputs an operation uses', () => {
-    expect(iopsBasis({ read: 0, write: 0 }, 96, 8)).toBeNull()
-    const readOnly = iopsBasis({ read: 500, write: 0 }, 96, 8)!
+    expect(one({ read: 0, write: 0 }, 96, 8)).toBeNull()
+    const readOnly = one({ read: 500, write: 0 }, 96, 8)!
     expect(estimateIops(readOnly, rep3, classic)).toMatchObject({ read: 6000, write: null })
     // classic EC writes read and write
-    expect(estimateIops(iopsBasis({ read: 0, write: 300 }, 96, 8)!, ec(4, 2), classic).write).toBeNull()
+    expect(estimateIops(one({ read: 0, write: 300 }, 96, 8)!, ec(4, 2), classic).write).toBeNull()
     expect(clusterIops(0, { reads: 1, writes: 0 }, { read: 100, write: 100 })).toBeNull()
   })
 
@@ -105,13 +109,13 @@ describe('cluster IOPS', () => {
 
 describe('explainIops', () => {
   it('writes out the arithmetic of an estimate', () => {
-    const basis = iopsBasis({ read: 100, write: 100 }, 8 * 4, 4)!
+    const basis = one({ read: 100, write: 100 }, 8 * 4, 4)!
     const optimized = estimateIops(basis, ec(4, 2), { ...classic, ecOptimizations: true })
     expect(explainIops(optimized, 'read')).toBe('8 OSDs × 100 IOPS ÷ 1 OSD read = 800')
     expect(explainIops(optimized, 'write')).toBe('8 OSDs ÷ (3 reads ÷ 100 + 3 writes ÷ 100 IOPS) = 133')
     const rep = estimateIops(basis, rep3, classic)
     expect(explainIops(rep, 'write')).toBe('8 OSDs × 100 IOPS ÷ 3 OSD writes = 267')
-    const mixed = estimateIops(iopsBasis({ read: 100, write: 0 }, 85, 2)!, rep3, classic)
+    const mixed = estimateIops(one({ read: 100, write: 0 }, 85, 2)!, rep3, classic)
     expect(explainIops(mixed, 'read')).toBe('42.5 capacity-weighted OSDs × 100 IOPS ÷ 1 OSD read = 4,250')
     expect(explainIops(mixed, 'write')).toBeNull()
   })
@@ -125,3 +129,49 @@ describe('describeCost', () => {
     expect(describeCost({ reads: 1, writes: 3 })).toBe('1 read + 3 writes')
   })
 })
+
+describe('mixed device classes', () => {
+  // any device class: 3 hosts × 8 ssd OSDs of 8 TB and 2 hosts × 8 hdd OSDs of 16 TB = 448 TB
+  const tree = [
+    newBucket('host', 'ssd01', { count: 3, osds: [newOsdGroup(8, 8)] }),
+    newBucket('host', 'hdd01', { count: 2, osds: [newOsdGroup(8, 16, 'hdd')] }),
+  ]
+  const usage = deviceClassUsage(tree)
+  const basis = (ssd: OsdIops, hdd: OsdIops) =>
+    iopsBasis(
+      [
+        { cls: 'hdd', osd: hdd, largestOsdTB: usage.hdd.largestTB },
+        { cls: 'ssd', osd: ssd, largestOsdTB: usage.ssd.largestTB },
+      ],
+      448,
+    )!
+
+  it('limits the pool to the class whose OSDs saturate first', () => {
+    expect([usage.ssd.largestTB, usage.hdd.largestTB]).toEqual([8, 16])
+    // ssd: 448 ÷ 8 = 56 × 50 000; hdd: 448 ÷ 16 = 28 × 200 → the hdd OSDs limit reads to 5 600
+    const r = estimateIops(basis({ read: 50_000, write: 20_000 }, { read: 200, write: 150 }), rep3, classic)
+    expect(r.read).toBe(5600)
+    expect(r.ops.read.limiting?.cls).toBe('hdd')
+    expect(r.ops.read.perClass).toEqual([
+      { cls: 'hdd', value: 5600 },
+      { cls: 'ssd', value: 2_800_000 },
+    ])
+    expect(r.write).toBe(1400) // 28 × 150 ÷ 3
+    expect(explainIops(r, 'read')).toBe('hdd OSDs saturate first: (448 TB ÷ 16 TB) × 200 IOPS ÷ 1 OSD read = 5,600 (ssd: 2,800,000)')
+  })
+
+  it('needs the values of every class the pool uses', () => {
+    const r = estimateIops(basis({ read: 50_000, write: 20_000 }, { read: 0, write: 0 }), rep3, classic)
+    expect([r.read, r.write]).toEqual([null, null])
+    expect(r.ops.read.missing).toEqual(['hdd'])
+    expect(explainIops(r, 'read')).toBeNull()
+  })
+
+  it('stays hidden until IOPS are entered for some class', () => {
+    const none = { read: 0, write: 0 }
+    expect(basis(none, none)).toBeNull()
+    // values only for a class the rule doesn't use still show the estimate (with its gaps)
+    expect(iopsBasis([{ cls: 'ssd', osd: none, largestOsdTB: 8 }], 192, 4, true)).not.toBeNull()
+  })
+})
+

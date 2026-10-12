@@ -137,9 +137,16 @@ real net = placeable(domains − N largest) × nearfull × f
 ## IOPS estimate (`src/lib/iops.ts`)
 
 ```
-N_eff = placed capacity / largest OSD      (CRUSH weights I/O by capacity; equal OSDs = OSD count)
-IOPS  = N_eff / (reads / R + writes / W)   (R, W = per-OSD read / write IOPS at the client I/O size, step 5)
+N_eff,c = placed capacity / largest OSD of class c   (CRUSH weights I/O by capacity; equal OSDs = OSD count)
+IOPS    = min over the pool's classes c of N_eff,c / (reads / R_c + writes / W_c)
+          (R_c, W_c = per-OSD read / write IOPS of class c at the client I/O size, step 5)
 ```
+
+- **Device classes:** step 5 has one tab per class in the tree (`treeClasses`; Basic: the rule's class or ssd, as
+  the Basic OSDs get it). `osdIops` maps class → values; classes without values have no entry (link key `io`:
+  `[sizeKiB, { class: [read, write] }]`). The basis takes the classes of the OSDs the rule uses (`poolTopology`) with
+  their largest OSD (`deviceClassUsage().largestTB`); the lowest class ceiling wins (`estimateOp`), and the tooltip
+  names that class.
 
 - **OSD operations per client op** (`opCosts`; d = min(k, ⌈I/O size / stripe_unit⌉), requests aligned to their size):
   - replication: 1 read / n writes;
@@ -148,8 +155,8 @@ IOPS  = N_eff / (reads / R + writes / W)   (R, W = per-OSD read / write IOPS at 
   - whole stripes (a multiple of k × stripe_unit): k+m writes and no reads; a remainder is a partial stripe.
 - **Checked against Ceph's FastEC table** (6+2, stripe_unit 16K: 4–16K writes 3r+3w, 32K writes 4r+4w); keep those
   test cases.
-- **Opt-in:** with both inputs at 0 the result card's IOPS row and the table's IOPS column are hidden. A value an
-  operation needs but that is 0 shows "—".
+- **Opt-in:** while no class has values the result card's IOPS row and the table's IOPS column are hidden. A value an
+  operation needs but that is missing for a class the pool uses shows "—" ("needs read IOPS for hdd").
 - **Scope:** a healthy-cluster ceiling only. Keep it that way unless the model is extended deliberately (network,
   CPU, latency and recovery are out of scope).
 

@@ -203,13 +203,21 @@ describe('topology', () => {
 
   it('stores the per-OSD IOPS in shared links only when set', () => {
     const state = defaultState()
-    expect([state.osdReadIops, state.osdWriteIops]).toEqual([0, 0])
+    expect(state.osdIops).toEqual({})
     expect(encodeState(state)).toBe(encodeState(decodeState(encodeState(state))!))
-    state.osdReadIops = 5000
-    state.osdWriteIops = 99_000_000
+    const packed = (st: typeof state) => JSON.parse(Buffer.from(encodeState(st), 'base64url').toString())
+    expect(packed(state).io).toBeUndefined()
+    state.osdIops = { ssd: { read: 5000, write: 99_000_000 }, 'fast-nvme': { read: 0, write: 800 }, hdd: { read: 0, write: 0 } }
     state.ioSizeKiB = 64
+    // only classes with values; IOPS clamped
+    expect(packed(state).io).toEqual([64, { ssd: [5000, 10_000_000], 'fast-nvme': [0, 800] }])
     const decoded = decodeState(encodeState(state))!
-    expect([decoded.osdReadIops, decoded.osdWriteIops, decoded.ioSizeKiB]).toEqual([5000, 10_000_000, 64])
+    expect(decoded.osdIops).toEqual({ ssd: { read: 5000, write: 10_000_000 }, 'fast-nvme': { read: 0, write: 800 } })
+    expect(decoded.ioSizeKiB).toBe(64)
+    // invalid class names from a link are dropped
+    const p = packed(state)
+    p.io[1]['bad name'] = [1, 1]
+    expect(decodeState(Buffer.from(JSON.stringify(p)).toString('base64url'))!.osdIops['bad name']).toBeUndefined()
     state.ioSizeKiB = 12 // not a supported size
     expect(decodeState(encodeState(state))!.ioSizeKiB).toBe(4)
   })
@@ -314,13 +322,13 @@ describe('device classes', () => {
 
   it('ignores OSD groups left on a bucket that is no host any more', () => {
     const former = newBucket('rack', 'rack9', { osds: [newOsdGroup(4, 4, 'hdd')] })
-    expect(deviceClassUsage([...tree(), former]).hdd).toEqual({ osds: 22, tb: 352 })
+    expect(deviceClassUsage([...tree(), former]).hdd).toEqual({ osds: 22, tb: 352, largestTB: 16 })
   })
 
   it('counts OSDs and capacity per class with multipliers', () => {
     expect(deviceClassUsage(tree())).toEqual({
-      ssd: { osds: 26, tb: 104 },
-      hdd: { osds: 22, tb: 352 },
+      ssd: { osds: 26, tb: 104, largestTB: 4 },
+      hdd: { osds: 22, tb: 352, largestTB: 16 },
     })
   })
 
