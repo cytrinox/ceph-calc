@@ -98,6 +98,7 @@ const commands = (rec: Recommendation) => [
             <div class="changes">
               <SettingChange v-for="c in item.rec.changes" :key="c.parameter" v-bind="c" />
             </div>
+            <pre v-if="item.rec.formula" class="formula">{{ item.rec.formula }}</pre>
             <DistributionBar
               v-if="item.rec.distribution"
               :result="result"
@@ -296,6 +297,19 @@ const commands = (rec: Recommendation) => [
 .changes {
   display: grid;
   gap: 0.5rem;
+}
+
+// Like the formula blocks in the FAQ and the CRUSH map panel; scrolls instead of wrapping to keep the = aligned.
+.formula {
+  margin: 0;
+  padding: 0.65rem 0.85rem;
+  border-radius: $radius-sm;
+  background: var(--code-bg);
+  color: var(--code-text);
+  font-family: $font-mono;
+  font-size: 0.82rem;
+  line-height: 1.6;
+  overflow-x: auto;
 }
 
 .detail {

@@ -227,6 +227,18 @@ describe('topology', () => {
     expect(decodeState(encodeState(state))!.ioSizeKiB).toBe(4)
   })
 
+  it('stores the PG target in shared links only when it differs from the default', () => {
+    const state = defaultState()
+    const packed = (st: typeof state) => JSON.parse(Buffer.from(encodeState(st), 'base64url').toString())
+    expect(state.pgTargetPerOsd).toBe(100)
+    expect(packed(state).pg).toBeUndefined()
+    state.pgTargetPerOsd = 200
+    expect(packed(state).pg).toBe(200)
+    expect(decodeState(encodeState(state))!.pgTargetPerOsd).toBe(200)
+    state.pgTargetPerOsd = 50_000
+    expect(decodeState(encodeState(state))!.pgTargetPerOsd).toBe(1000)
+  })
+
   it('stores the virtual CRUSH map switch in shared links only when on', () => {
     const state = defaultState()
     const packed = (st: typeof state) => JSON.parse(Buffer.from(encodeState(st), 'base64url').toString())

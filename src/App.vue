@@ -258,6 +258,8 @@ const recommendationList = computed(() =>
     pool: state.pool,
     ioSizeKiB: state.ioSizeKiB,
     iops: iops.value,
+    osdCount: poolStats.value.counts.osd,
+    pgTargetPerOsd: state.pgTargetPerOsd,
   }),
 )
 
@@ -345,7 +347,6 @@ watch(
         :state="state"
         :domain-options="domainOptions"
         :osd-count="stats.counts.osd"
-        :pool-osd-count="poolStats.counts.osd"
         :tree-classes="Object.keys(classUsage)"
         :iops-classes="iopsClasses"
         :domain-count="result.domainCount"
@@ -383,6 +384,7 @@ watch(
           :tunables="tunables"
           :placement-problem="placementProblem"
           :recommendations="recommendationList"
+          :pg-target-per-osd="state.pgTargetPerOsd"
         />
         <FaqPanel />
       </div>

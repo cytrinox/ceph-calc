@@ -87,7 +87,7 @@ real net = placeable(domains − N largest) × nearfull × f
   in place (Enter or blur turns it back, Escape cancels); step 4 uses it too, with "Any device". Links only keep valid names (else ssd, or any for the pool). A CRUSH rule
   restricted to a class (step 4) computes on `filterDeviceClass()`: hosts keep only that class's OSDs, and buckets
   that lose all their capacity through the filter are dropped (Ceph's empty shadow buckets). Buckets that were empty
-  already stay, so the filter never adds empty-domain warnings. Facts, IOPS and the pg_num suggestion use the
+  already stay, so the filter never adds empty-domain warnings. Facts, IOPS and the pg_num recommendation use the
   filtered tree; step 1's summary and the failure-domain options use the whole tree. Basic OSDs always match the
   rule (no filter).
 - **"Not enough failure domains" wording** comes from `placementHint()` / `placementMessage()` only (e.g. "needs 8
@@ -128,14 +128,18 @@ real net = placeable(domains − N largest) × nearfull × f
     when there are too few hosts for it;
   - `allow_ec_optimizations` for EC pools without it (jerasure/isa with reed_sol_van only), raising `stripe_unit` to
     16K; the change rows show the OSD operations per client op and, with IOPS set, the estimate. The details say
-    Tentacle (v20) or later and that it cannot be switched off. Adopted pool options are a `SetupChange.pool`.
+    Tentacle (v20) or later and that it cannot be switched off. Adopted pool options are a `SetupChange.pool`;
+  - `pg_num` for pools that set their own (autoscaler off or warn) whenever it differs from `suggestPgNum()`. The
+    details add when Ceph would warn (more than `PG_AUTOSCALE_THRESHOLD` = 3× off, warn mode) or refuse the pool
+    (more than `MAX_PG_PER_OSD` = 250 PG replicas per OSD).
 - **Severity:** `critical` (red warning sign before the headline) only when the current setup risks data loss, e.g.
   replication size 1; everything else is `info` (light bulb, the panel's colour).
 - **Collapsed by default:** each recommendation shows only its pictogram, headline, adopt button and chevron; the
   headline (a button with `aria-expanded`) or the chevron expands the rest. The open state is local, not in links.
 - **New kinds:** add them to `recommendations()` with their own tests. Keep the texts in the `Recommendation` fields so
   the panel stays generic. Settings a recommendation changes are `changes` ("parameter: from → to"), rendered by the
-  generic `SettingChange.vue` (not as KPI-like tiles, which show outcomes).
+  generic `SettingChange.vue` (not as KPI-like tiles, which show outcomes). A calculated value shows its calculation
+  in `formula` (a formula block below the changes: the general form, the numbers, the result), not only in prose.
 
 ## IOPS estimate (`src/lib/iops.ts`)
 
@@ -232,7 +236,7 @@ IOPS    = min over the pool's classes c of N_eff,c / (reads / R_c + writes / W_c
 
 ### State, links and storage
 - **Shared links:** the whole configuration lives in the URL hash as base64url JSON (`#s=…`). Short keys are listed in
-  `urlState.ts`: `v t b a d s f bf nf r p pt cu io cm`. OSD groups in the tree pack as `[count, sizeTB]`, plus the
+  `urlState.ts`: `v t b a d s f bf nf r p pt cu io cm pg`. OSD groups in the tree pack as `[count, sizeTB]`, plus the
   device class when it isn't ssd (`[8, 16, 'hdd']`).
   - Clamp and validate on **both** encode and decode.
   - Share limits through constants, e.g. `CURRENCY_MAX_LENGTH`.
@@ -251,9 +255,19 @@ IOPS    = min over the pool's classes c of N_eff,c / (reads / R_c + writes / W_c
 - **Examples:** each entry in `TOPOLOGY_EXAMPLES` loads a complete setup: topology, failure domain, scheme and
   recovery reserve, with the default ratios. A test checks that every example gives a valid layout.
 
+### Placement groups (`pool.ts`)
+- **Like Ceph's autoscaler** (checked in its source): `suggestPgNum()` = OSDs × `mon_target_pg_per_osd` ÷ pool width,
+  rounded with `nearestPowerOfTwo()` (Ceph's `nearest_power_of_two`). The target is a step 5 setting
+  (`pgTargetPerOsd`, default 100 like every Ceph release up to Tentacle; Ceph's development branch raises it to 200
+  and `mon_max_pg_per_osd` from 250 to 500, commit d34fa3316f. Link key `pg`).
+- **`pg_num`** (default 32, Ceph's `osd_pool_default_pg_num`) is used and shown with the autoscaler off or in warn
+  mode (`usesPgNum`); "on" creates the pool with `AUTOSCALE_START_PG`.
+
 ### Generated commands (`commands.ts`)
 - **EC `min_size` only when changed:** Ceph sets the default on creation, so `min_size` is emitted for EC pools only
   when the user picked a different value.
+- **Cluster-wide settings** (switch "Include cluster-wide settings", `includeClusterSettings`): the fill ratios and,
+  when it isn't 100, `mon_target_pg_per_osd`. Applied recommendation ratios are emitted even with the switch off.
 - **No empty sections:** push a section only when it has lines (e.g. "EC options", "Autoscaler hints").
 - **Default names:**
   - CRUSH rules: `rep3_host`, `ec4-2_rack_nvme` (k and m separated, so EC 2+11 and EC 21+1 don't collide);

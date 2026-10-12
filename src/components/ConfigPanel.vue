@@ -16,6 +16,7 @@ import { CUSTOM_EC, CUSTOM_REPLICATED, DEFAULT_PRESET_ID, PRESETS, schemeLabel, 
 import { formatInt, formatIops } from '@/lib/format'
 import { BASIC_IOPS, IO_SIZES_KIB, MAX_OSD_IOPS, ioSizeLabel, type OsdIops } from '@/lib/iops'
 import { CURRENCY_MAX_LENGTH, formatPrice } from '@/lib/pricing'
+import { DEFAULT_PG_TARGET_PER_OSD, MAX_PG_TARGET_PER_OSD } from '@/lib/pool'
 import { DEFAULT_OSD_CLASS, TYPE_ID, plural, type DomainType, type TopologyExample } from '@/lib/topology'
 import { defaultState, encodeState, type AppState, type TopologyTab } from '@/lib/urlState'
 
@@ -23,8 +24,6 @@ const props = defineProps<{
   state: AppState
   domainOptions: DomainType[]
   osdCount: number
-  /** OSDs the CRUSH rule uses (its device class only), for the pg_num suggestion. */
-  poolOsdCount: number
   /** Device classes used in the Advanced tree. */
   treeClasses: string[]
   /** Device classes of the hardware (Basic: the rule's class or ssd): one IOPS tab each. */
@@ -164,7 +163,8 @@ const miscSummary = computed(() => {
       ? `read ${value(st.osdIops[key].read)} · write ${value(st.osdIops[key].write)}`
       : `${key} ${value(st.osdIops[key].read)} / ${value(st.osdIops[key].write)}`
   const iops = set.length ? `${ioSizeLabel(st.ioSizeKiB)} · ${set.map(values).join(' · ')} IOPS per OSD` : 'no IOPS'
-  return [price, iops, ...(st.crushMap ? ['CRUSH map'] : [])].join(' · ')
+  const pgTarget = st.pgTargetPerOsd !== DEFAULT_PG_TARGET_PER_OSD ? [`PG target ${formatInt(st.pgTargetPerOsd)}`] : []
+  return [price, iops, ...pgTarget, ...(st.crushMap ? ['CRUSH map'] : [])].join(' · ')
 })
 
 // Per-OSD IOPS, one tab per device class of the Advanced tree; the Basic tab has one set without a class (no tabs).
@@ -381,7 +381,6 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
         :pool="state.pool"
         :scheme="state.scheme"
         :domain="state.failureDomain"
-        :osd-count="poolOsdCount"
         :tree-classes="treeClasses"
       />
     </StepSection>
@@ -458,6 +457,19 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
           <code>ceph tell osd.N bench</code> for writes), so BlueStore overhead is included. Each device class has its
           own values (Advanced tab). Leave them all empty to hide the estimate.
         </p>
+      </div>
+
+      <div class="misc-group">
+        <h4>Placement groups</h4>
+        <NumberField
+          v-model="state.pgTargetPerOsd"
+          label="PG target per OSD"
+          hint="mon_target_pg_per_osd: PG replicas per OSD the autoscaler aims for."
+          :default-value="DEFAULT_PG_TARGET_PER_OSD"
+          :min="1"
+          :max="MAX_PG_TARGET_PER_OSD"
+          :step="10"
+        />
       </div>
 
       <div class="misc-group">

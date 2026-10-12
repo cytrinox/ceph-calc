@@ -280,3 +280,81 @@ describe('EC optimizations recommendation', () => {
   })
 })
 
+describe('pg_num recommendation', () => {
+  const none = { ...ratios, recoveryReserve: 0 }
+  // 5 hosts × 8 OSDs = 40 OSDs
+  const pgRecs = (pool: Partial<PoolOptions>, pgTargetPerOsd?: number, scheme: Scheme = rep3) => {
+    const input = hosts(5)
+    return recommendations({
+      input,
+      result: computeCapacity(input, scheme, none),
+      tunables: none,
+      scheme,
+      domain: 'host',
+      pool: { ...defaultPoolOptions(), ...pool },
+      osdCount: 40,
+      pgTargetPerOsd,
+    })
+  }
+  const find = (list: ReturnType<typeof pgRecs>) => list.find((r) => r.id === 'pg-num')
+
+  it('recommends the pg_num the autoscaler aims for instead of the default', () => {
+    const rec = find(pgRecs({ autoscaleMode: 'warn' }))!
+    expect(rec.title).toBe('Set pg_num to 1024')
+    expect(rec.severity).toBe('info')
+    expect(rec.changes).toEqual([
+      {
+        parameter: 'pg_num (step 4)',
+        from: '32',
+        fromNote: 'Ceph default; 2.4 PG replicas per OSD',
+        to: '1024',
+        toNote: '77 per OSD; target 100',
+      },
+    ])
+    expect(rec.formula).toBe(
+      [
+        'pg_num ≈ OSDs × PG target ÷ copies',
+        '       = 40 × 100 ÷ 3 = 1,333',
+        '       → closest power of two: 1024',
+      ].join('\n'),
+    )
+    expect(rec.details.join(' ')).toContain('mon_target_pg_per_osd, 100, step 5')
+    // 32 is 32× below 1024: the autoscaler warns
+    expect(rec.details.join(' ')).toContain('reports POOL_TOO_FEW_PGS')
+    expect(rec.adopt).toEqual({ summary: 'pg_num 1024', setup: { pool: { pgNum: 1024 } } })
+    expect(isApplicable(rec)).toBe(false)
+  })
+
+  it('follows the PG target and only reports autoscaler warnings in warn mode', () => {
+    const off = find(pgRecs({ autoscaleMode: 'off', pgNum: 512 }, 200))!
+    expect(off.changes[0]).toMatchObject({ from: '512', to: '2048', fromNote: '38 PG replicas per OSD', toNote: '154 per OSD; target 200' })
+    expect(off.details.join(' ')).not.toContain('POOL_TOO')
+    // 2× off is within the autoscaler's threshold
+    expect(find(pgRecs({ autoscaleMode: 'warn', pgNum: 2048 }))!.details.join(' ')).not.toContain('POOL_TOO')
+  })
+
+  it('warns when Ceph would refuse the pool', () => {
+    // 4096 × 3 ÷ 40 = 307 PG replicas per OSD > 250
+    const rec = find(pgRecs({ autoscaleMode: 'off', pgNum: 4096 }))!
+    expect(rec.details.join(' ')).toContain('Ceph refuses to create the pool: mon_max_pg_per_osd allows 250')
+    expect(find(pgRecs({ autoscaleMode: 'off', pgNum: 2048 }))!.details.join(' ')).not.toContain('refuses')
+  })
+
+  it('speaks of shards for EC pools', () => {
+    const rec = find(pgRecs({ autoscaleMode: 'off' }, undefined, { kind: 'ec', k: 4, m: 2 }))!
+    // 40 × 100 ÷ 6 = 667 → 512
+    expect(rec.formula?.split('\n')).toEqual([
+      'pg_num ≈ OSDs × PG target ÷ shards',
+      '       = 40 × 100 ÷ 6 = 667',
+      '       → closest power of two: 512',
+    ])
+    expect(rec.details.join(' ')).toContain('every PG lives on 6 OSDs (its shards)')
+  })
+
+  it('is only for pools with their own pg_num that differs', () => {
+    expect(find(pgRecs({ autoscaleMode: 'on' }))).toBeUndefined()
+    expect(find(pgRecs({ autoscaleMode: 'off', pgNum: 1024 }))).toBeUndefined()
+    expect(find(pgRecs({ autoscaleMode: 'off', pgNum: 2048 }, 200))).toBeUndefined()
+  })
+})
+

@@ -15,7 +15,7 @@ const input = (scheme: Scheme, pool = defaultPoolOptions(), extra: Partial<Comma
   scheme,
   domain: 'host',
   tunables,
-  includeClusterRatios: true,
+  includeClusterSettings: true,
   ...extra,
 })
 
@@ -70,10 +70,11 @@ describe('buildCommands', () => {
       noSizeChange: true,
       application: 'none' as const,
     }
-    const s = script(input({ kind: 'replicated', size: 3, minSize: 2 }, pool, { includeClusterRatios: false }))
+    const s = script(input({ kind: 'replicated', size: 3, minSize: 2 }, pool, { includeClusterSettings: false }))
     expect(s).not.toContain('set-full-ratio')
     expect(s).toContain('ceph osd pool create data 512 512')
     expect(s).toContain('--autoscale-mode=off')
+    expect(s).not.toContain('autoscaler')
     expect(s).toContain('compression_mode aggressive')
     expect(s).toContain('compression_algorithm zstd')
     expect(s).toContain('set-quota data max_bytes 1500000000000  # 1.5 TB')
@@ -103,13 +104,13 @@ describe('buildCommands', () => {
     expect(all).toContain('ceph osd set-nearfull-ratio 0.68  # recommended (planning value 0.85)')
     expect(all).toContain('ceph osd set-backfillfull-ratio 0.90\nceph osd set-full-ratio 0.95')
     const only = script(
-      input({ kind: 'replicated', size: 3, minSize: 2 }, defaultPoolOptions(), { ...overrides, includeClusterRatios: false }),
+      input({ kind: 'replicated', size: 3, minSize: 2 }, defaultPoolOptions(), { ...overrides, includeClusterSettings: false }),
     )
-    expect(only).toContain('# Cluster-wide fill ratios')
+    expect(only).toContain('# Cluster-wide settings')
     expect(only).toContain('ceph osd set-nearfull-ratio 0.68')
     expect(only).not.toContain('set-backfillfull-ratio')
-    const none = script(input({ kind: 'replicated', size: 3, minSize: 2 }, defaultPoolOptions(), { includeClusterRatios: false }))
-    expect(none).not.toContain('Cluster-wide fill ratios')
+    const none = script(input({ kind: 'replicated', size: 3, minSize: 2 }, defaultPoolOptions(), { includeClusterSettings: false }))
+    expect(none).not.toContain('Cluster-wide settings')
   })
 
   it('emits config settings from applied recommendations before the pool is created', () => {
@@ -162,3 +163,27 @@ describe('helpers', () => {
     expect(s.startsWith('#!/bin/sh\nset -e\n')).toBe(true)
   })
 })
+
+describe('placement groups', () => {
+  const rep3: Scheme = { kind: 'replicated', size: 3, minSize: 2 }
+
+  it('creates the pool with its own pg_num when the autoscaler only warns', () => {
+    const s = script(input(rep3, { ...defaultPoolOptions(), autoscaleMode: 'warn' }))
+    expect(s).toContain('ceph osd pool create data 32 32')
+    expect(s).toContain('# The autoscaler only warns when pg_num is more than 3× off its target')
+    const on = script(input(rep3, { ...defaultPoolOptions(), pgNum: 512 }))
+    expect(on).toContain('ceph osd pool create data 32 32')
+    expect(on).toContain('the autoscaler adjusts pg_num')
+  })
+
+  it('sets the PG target on the cluster only when it differs from the default', () => {
+    expect(script(input(rep3, defaultPoolOptions(), { pgTargetPerOsd: 100 }))).not.toContain('mon_target_pg_per_osd')
+    const s = script(input(rep3, defaultPoolOptions(), { pgTargetPerOsd: 200 }))
+    expect(s).toContain('# Cluster-wide settings')
+    expect(s).toContain('ceph config set global mon_target_pg_per_osd 200  # PG replicas per OSD (Ceph default 100)')
+    expect(script(input(rep3, defaultPoolOptions(), { pgTargetPerOsd: 200, includeClusterSettings: false }))).not.toContain(
+      'mon_target_pg_per_osd',
+    )
+  })
+})
+

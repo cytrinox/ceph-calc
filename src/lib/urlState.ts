@@ -9,6 +9,8 @@ import {
   EC_PLUGINS,
   EC_TECHNIQUES,
   STRIPE_UNITS_KIB,
+  DEFAULT_PG_TARGET_PER_OSD,
+  MAX_PG_TARGET_PER_OSD,
   defaultPoolOptions,
   type PoolOptions,
 } from './pool'
@@ -53,6 +55,8 @@ export interface AppState {
   ioSizeKiB: number
   /** Show the virtual CRUSH map (`ceph osd crush tree`) of the hardware. */
   crushMap: boolean
+  /** mon_target_pg_per_osd: PG replicas per OSD the pg_num suggestion (and the autoscaler) aims for. */
+  pgTargetPerOsd: number
 }
 
 export function defaultState(): AppState {
@@ -72,6 +76,7 @@ export function defaultState(): AppState {
     osdIops: {},
     ioSizeKiB: DEFAULT_IO_SIZE_KIB,
     crushMap: false,
+    pgTargetPerOsd: DEFAULT_PG_TARGET_PER_OSD,
   }
 }
 
@@ -99,9 +104,14 @@ interface Packed {
   io?: [number, Record<string, [number, number]>]
   /** 1 = show the virtual CRUSH map; left out when off. */
   cm?: 1
+  /** PG target per OSD; left out at Ceph's default. */
+  pg?: number
 }
 
 const iops = (value: unknown) => Math.min(MAX_OSD_IOPS, int(value))
+/** PG target per OSD within 1–MAX_PG_TARGET_PER_OSD; Ceph's default when unusable. */
+const pgTarget = (value: unknown) =>
+  int(value) > 0 ? Math.min(MAX_PG_TARGET_PER_OSD, int(value)) : DEFAULT_PG_TARGET_PER_OSD
 
 /** IOPS keys: device class names, or the Basic tab's class-less values. */
 const isIopsKey = (key: string) => key === BASIC_IOPS || isValidDeviceClass(key)
@@ -270,6 +280,7 @@ export function encodeState(state: AppState): string {
     cu: state.currency,
     ...packIops(state),
     ...(state.crushMap ? { cm: 1 as const } : {}),
+    ...(pgTarget(state.pgTargetPerOsd) !== DEFAULT_PG_TARGET_PER_OSD ? { pg: pgTarget(state.pgTargetPerOsd) } : {}),
   }
   if (state.advanced) packed.a = state.advanced.map(packBucket)
   return toBase64Url(JSON.stringify(packed))
@@ -306,6 +317,7 @@ export function decodeState(data: string): AppState | null {
       state.osdIops = unpackIops(p.io[1])
     }
     state.crushMap = p.cm === 1
+    if (p.pg !== undefined) state.pgTargetPerOsd = pgTarget(p.pg)
     return state
   } catch {
     return null

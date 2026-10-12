@@ -17,9 +17,11 @@ const props = defineProps<{
   /** Message when the layout cannot be placed on the topology. */
   placementProblem?: string
   recommendations: Recommendation[]
+  /** mon_target_pg_per_osd (step 5); set on the cluster when it differs from Ceph's default. */
+  pgTargetPerOsd: number
 }>()
 
-const includeClusterRatios = ref(true)
+const includeClusterSettings = ref(true)
 
 // Recommendations that change the commands are opt-in; once applied, each can still be switched off on its own.
 // (Recommendations that change the setup are adopted in their panel instead.)
@@ -40,7 +42,8 @@ const sections = computed(() =>
     scheme: props.scheme,
     domain: props.domain,
     tunables: props.tunables,
-    includeClusterRatios: includeClusterRatios.value,
+    includeClusterSettings: includeClusterSettings.value,
+    pgTargetPerOsd: props.pgTargetPerOsd,
     ratioOverrides: Object.assign({}, ...applied.value.map((r) => r.ratios ?? {})),
     configSettings: applied.value.flatMap((r) => r.config ?? []),
   }),
@@ -109,9 +112,9 @@ function download() {
     <div class="intro">
       <p>Run these in order on a node with an admin keyring. They follow the settings from steps 2–4.</p>
       <ToggleField
-        v-model="includeClusterRatios"
-        label="Include cluster-wide ratios"
-        hint="nearfull / backfillfull / full apply to all pools"
+        v-model="includeClusterSettings"
+        label="Include cluster-wide settings"
+        hint="the fill ratios and the PG target apply to all pools"
       />
       <template v-if="applicable.length">
         <ToggleField

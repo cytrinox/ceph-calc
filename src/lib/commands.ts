@@ -1,7 +1,14 @@
 // Generates the Ceph CLI commands that create a pool for the current configuration.
 
 import { customEcMinSize, type Scheme, type Tunables } from './ceph'
-import { effectiveProfileName, effectiveRuleName, type PoolOptions } from './pool'
+import {
+  DEFAULT_PG_TARGET_PER_OSD,
+  effectiveProfileName,
+  effectiveRuleName,
+  PG_AUTOSCALE_THRESHOLD,
+  usesPgNum,
+  type PoolOptions,
+} from './pool'
 import type { ConfigSetting, RatioKey } from './recommendations'
 import type { DomainType } from './topology'
 
@@ -23,8 +30,10 @@ export interface CommandInput {
   scheme: Scheme
   domain: DomainType
   tunables: Tunables
-  /** Include cluster-wide ratio commands (they affect every pool). */
-  includeClusterRatios: boolean
+  /** Include cluster-wide settings: the fill ratios and the PG target (they affect every pool). */
+  includeClusterSettings: boolean
+  /** mon_target_pg_per_osd; set on the cluster when it differs from Ceph's default. */
+  pgTargetPerOsd?: number
   /** Ratios from applied recommendations; emitted even without the other cluster-wide ratios. */
   ratioOverrides?: Partial<Record<RatioKey, number>>
   /** `ceph config set global` options from applied recommendations. */
@@ -74,19 +83,31 @@ export function buildCommands(input: CommandInput): CommandSection[] {
   }
   const overrides = input.ratioOverrides ?? {}
   const ratioLines = (['nearfull', 'backfillfull', 'full'] as const)
-    .filter((key) => input.includeClusterRatios || overrides[key] !== undefined)
+    .filter((key) => input.includeClusterSettings || overrides[key] !== undefined)
     .map((key) => {
       const value = overrides[key]
       return value === undefined
         ? cmd(ratioCommand(key, planned[key]))
         : { ...cmd(ratioCommand(key, value)), note: `recommended (planning value ${ratio(planned[key])})` }
     })
-  if (ratioLines.length) {
+  // The PG target drives the autoscaler (and the pg_num suggestion); set it only when it differs from Ceph's default.
+  const pgTarget = input.pgTargetPerOsd ?? DEFAULT_PG_TARGET_PER_OSD
+  const clusterLines =
+    input.includeClusterSettings && pgTarget !== DEFAULT_PG_TARGET_PER_OSD
+      ? [
+          ...ratioLines,
+          {
+            ...cmd(configCommand('mon_target_pg_per_osd', String(pgTarget))),
+            note: `PG replicas per OSD (Ceph default ${DEFAULT_PG_TARGET_PER_OSD})`,
+          },
+        ]
+      : ratioLines
+  if (clusterLines.length) {
     sections.push({
       id: 'ratios',
-      title: 'Cluster-wide fill ratios',
+      title: 'Cluster-wide settings',
       note: 'These apply to every pool in the cluster.',
-      lines: ratioLines,
+      lines: clusterLines,
     })
   }
 
@@ -124,11 +145,16 @@ export function buildCommands(input: CommandInput): CommandSection[] {
     ],
   })
 
-  const pg = pool.autoscaleMode === 'off' ? pool.pgNum : AUTOSCALE_START_PG
+  const pg = usesPgNum(pool) ? pool.pgNum : AUTOSCALE_START_PG
+  const createNote = {
+    on: `Starts with ${pg} PGs; the autoscaler adjusts pg_num.`,
+    warn: `The autoscaler only warns when pg_num is more than ${PG_AUTOSCALE_THRESHOLD}× off its target; it doesn't change it.`,
+    off: undefined,
+  }[pool.autoscaleMode]
   sections.push({
     id: 'create',
     title: 'Create the pool',
-    note: pool.autoscaleMode === 'off' ? undefined : `Starts with ${pg} PGs; the autoscaler adjusts pg_num.`,
+    note: createNote,
     lines: [
       {
         parts: [

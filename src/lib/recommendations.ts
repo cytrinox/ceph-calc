@@ -3,11 +3,21 @@
 // - adopted: changes to the calculator's own setup (`adopt`), taken over with a button.
 // Add new kinds to `recommendations()`.
 
-import { computeCapacity, type CapacityInput, type CapacityResult, type Scheme, type Tunables } from './ceph'
+import { computeCapacity, schemeWidth, type CapacityInput, type CapacityResult, type Scheme, type Tunables } from './ceph'
 import { CRUSH_WEIGHT_MAX, initialWeightFor, type CrushWeightOverflow } from './crushTree'
 import { formatInt, formatIops, formatPct } from './format'
 import { describeCost, estimateIops, ioSizeLabel, opCosts, type IopsBasis, type OpCosts } from './iops'
-import { EC_OPTIMIZATION_PLUGINS, type PoolOptions } from './pool'
+import {
+  DEFAULT_PG_TARGET_PER_OSD,
+  DEFAULT_POOL_PG_NUM,
+  EC_OPTIMIZATION_PLUGINS,
+  MAX_PG_PER_OSD,
+  PG_AUTOSCALE_THRESHOLD,
+  pgReplicasPerOsd,
+  suggestPgNum,
+  usesPgNum,
+  type PoolOptions,
+} from './pool'
 import { PRESETS } from './schemes'
 import { plural, type DomainType } from './topology'
 import { formatCapacity } from './units'
@@ -37,6 +47,10 @@ export interface RecommendationInput {
   ioSizeKiB?: number
   /** IOPS basis when per-OSD IOPS are set, to show what a change does to the estimate. */
   iops?: IopsBasis | null
+  /** OSDs the CRUSH rule uses (its device class only). */
+  osdCount?: number
+  /** mon_target_pg_per_osd (step 5). */
+  pgTargetPerOsd?: number
 }
 
 export type MarkerKind = 'nearfull' | 'backfillfull' | 'full' | 'recommended'
@@ -78,6 +92,8 @@ export interface Recommendation {
   config?: ConfigSetting[]
   /** Show the raw data distribution with a marker at this nearfull ratio. */
   distribution?: { nearfull: number }
+  /** The calculation behind the recommended value, shown as a formula block below the changes. */
+  formula?: string
   /** Setup change taken over with "Adopt recommendation"; `summary` names it afterwards ("recovery reserve of 1 host"). */
   adopt?: { summary: string; setup: SetupChange }
 }
@@ -482,6 +498,76 @@ export function ecOptimizationsRecommendation({
   }
 }
 
+/**
+ * pg_num as Ceph's autoscaler would pick it, when the pool sets its own (autoscaler off or warn) and it differs:
+ * the PG target per OSD (step 5) × OSDs ÷ pool width, as the nearest power of two.
+ */
+export function pgNumRecommendation({
+  scheme,
+  pool,
+  osdCount,
+  pgTargetPerOsd,
+}: RecommendationInput): Recommendation | null {
+  if (!pool || !usesPgNum(pool) || !osdCount || osdCount <= 0) return null
+  const target = pgTargetPerOsd ?? DEFAULT_PG_TARGET_PER_OSD
+  const suggested = suggestPgNum(osdCount, scheme, target)
+  const current = pool.pgNum
+  if (current === suggested) return null
+  const width = schemeWidth(scheme)
+  const copies = scheme.kind === 'replicated' ? 'copies' : 'shards'
+  const ideal = (osdCount * target) / width
+  const raw = ideal < 10 ? ideal.toFixed(1) : formatInt(Math.round(ideal))
+  // Short lines: the block fits a phone without scrolling.
+  const formula = [
+    `pg_num ≈ OSDs × PG target ÷ ${copies}`,
+    `       = ${formatInt(osdCount)} × ${formatInt(target)} ÷ ${width} = ${raw}`,
+    `       → closest power of two: ${suggested}`,
+  ].join('\n')
+  const perOsd = (pg: number) => {
+    const n = pgReplicasPerOsd(pg, scheme, osdCount)
+    return n < 10 ? n.toFixed(1) : formatInt(Math.round(n))
+  }
+  const details = [
+    'Every PG is placed on its own set of OSDs. Too few PGs spread the data unevenly over the OSDs, so some fill ' +
+      'up first, give less parallelism and make each PG bigger to recover. Too many cost memory and CPU on every ' +
+      'OSD and more peering.',
+    `This is how Ceph's autoscaler sizes a pool: the PG target is the number of PG replicas each OSD should hold ` +
+      `(mon_target_pg_per_osd, ${formatInt(target)}, step 5), and every PG lives on ${width} OSDs (its ${copies}). ` +
+      "It assumes this pool holds the cluster's data; with more pools, share the PGs by their expected data.",
+  ]
+  const factor = Math.max(current / suggested, suggested / current)
+  if (pool.autoscaleMode === 'warn' && factor > PG_AUTOSCALE_THRESHOLD) {
+    details.push(
+      `${current} is more than ${PG_AUTOSCALE_THRESHOLD}× off, so the autoscaler in warn mode reports ` +
+        `${current < suggested ? 'POOL_TOO_FEW_PGS' : 'POOL_TOO_MANY_PGS'}.`,
+    )
+  }
+  if (pgReplicasPerOsd(current, scheme, osdCount) > MAX_PG_PER_OSD) {
+    details.push(
+      `With ${perOsd(current)} PG replicas per OSD, Ceph refuses to create the pool: mon_max_pg_per_osd allows ` +
+        `${MAX_PG_PER_OSD}.`,
+    )
+  }
+  return {
+    id: 'pg-num',
+    severity: 'info',
+    // pg_num values as Ceph takes them (2048, not 2,048).
+    title: `Set pg_num to ${suggested}`,
+    changes: [
+      {
+        parameter: 'pg_num (step 4)',
+        from: String(current),
+        fromNote: `${current === DEFAULT_POOL_PG_NUM ? 'Ceph default; ' : ''}${perOsd(current)} PG replicas per OSD`,
+        to: String(suggested),
+        toNote: `${perOsd(suggested)} per OSD; target ${formatInt(target)}`,
+      },
+    ],
+    formula,
+    details,
+    adopt: { summary: `pg_num ${suggested}`, setup: { pool: { pgNum: suggested } } },
+  }
+}
+
 export function recommendations(input: RecommendationInput): Recommendation[] {
   return [
     replicationRecommendation(input),
@@ -491,5 +577,6 @@ export function recommendations(input: RecommendationInput): Recommendation[] {
     recoveryReserveRecommendation(input),
     nearfullRecommendation(input),
     ecOptimizationsRecommendation(input),
+    pgNumRecommendation(input),
   ].filter((r): r is Recommendation => r !== null)
 }

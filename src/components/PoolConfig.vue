@@ -7,7 +7,7 @@ import SelectField from './SelectField.vue'
 import TextField from './TextField.vue'
 import ToggleField from './ToggleField.vue'
 import type { Scheme } from '@/lib/ceph'
-import { formatInt, formatTB } from '@/lib/format'
+import { formatTB } from '@/lib/format'
 import {
   DEFAULT_COMPRESSION_RATIO,
   defaultProfileName,
@@ -17,7 +17,8 @@ import {
   poolIssues,
   STRIPE_UNITS_KIB,
   TECHNIQUES_BY_PLUGIN,
-  suggestPgNum,
+  usesPgNum,
+  DEFAULT_POOL_PG_NUM,
   type Application,
   type AutoscaleMode,
   type CompressionAlgorithm,
@@ -32,7 +33,6 @@ const props = defineProps<{
   pool: PoolOptions
   scheme: Scheme
   domain: DomainType
-  osdCount: number
   /** Device classes used in the Advanced tree (custom ones become selectable). */
   treeClasses: string[]
 }>()
@@ -80,9 +80,9 @@ const stripeUnit = computed({
 })
 
 const autoscaleModes: { value: AutoscaleMode; label: string }[] = [
-  { value: 'on', label: 'on: manage pg_num' },
+  { value: 'on', label: 'on: manage the number of PGs' },
   { value: 'warn', label: 'warn: only report' },
-  { value: 'off', label: 'off: fixed pg_num' },
+  { value: 'off', label: 'off: fixed number of PGs' },
 ]
 
 const compressionModes: { value: CompressionMode; label: string }[] = [
@@ -102,15 +102,14 @@ const compressionAlgorithms: { value: CompressionAlgorithm; label: string }[] = 
 const isEc = computed(() => props.scheme.kind === 'ec')
 const ruleDefault = computed(() => defaultRuleName(props.scheme, props.domain, props.pool.deviceClass))
 const profileDefault = computed(() => defaultProfileName(props.scheme, props.domain, props.pool.deviceClass))
-const suggestedPg = computed(() => suggestPgNum(props.osdCount, props.scheme))
 const issues = computed(() => poolIssues(props.pool, props.scheme))
 
 const pgSummary = computed(() => {
   const p = props.pool
-  if (p.autoscaleMode === 'off') return `pg_num ${p.pgNum}`
+  if (p.autoscaleMode === 'off') return `${p.pgNum} PGs`
   const target =
     p.targetSizeRatio > 0 ? ` · ratio ${p.targetSizeRatio.toFixed(2)}` : p.targetSizeTB > 0 ? ` · ${formatTB(p.targetSizeTB)}` : ''
-  return `autoscale ${p.autoscaleMode}${target}`
+  return `autoscale ${p.autoscaleMode}${p.autoscaleMode === 'warn' ? ` · ${p.pgNum} PGs` : ''}${target}`
 })
 const compressionSummary = computed(() =>
   props.pool.compressionMode === 'none'
@@ -194,16 +193,17 @@ const safetySummary = computed(() => {
       </summary>
       <div class="group-body">
         <SelectField v-model="pool.autoscaleMode" label="PG autoscaler" :options="autoscaleModes" />
+        <!-- Off: the pool keeps its pg_num; warn: the autoscaler only reports, so the pool needs one too. -->
         <NumberField
-          v-if="pool.autoscaleMode === 'off'"
+          v-if="usesPgNum(pool)"
           v-model="pool.pgNum"
-          label="pg_num"
-          :hint="`Suggested ${formatInt(suggestedPg)} for ${formatInt(osdCount)} OSDs`"
+          label="Number of PGs"
+          :default-value="DEFAULT_POOL_PG_NUM"
           :min="1"
           :max="32768"
           pow2
         />
-        <template v-else>
+        <template v-if="pool.autoscaleMode !== 'off'">
           <ToggleField
             v-model="pool.bulk"
             label="Bulk pool"

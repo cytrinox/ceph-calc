@@ -6,8 +6,11 @@ import {
   defaultRuleName,
   effectiveRuleName,
   isValidName,
+  nearestPowerOfTwo,
+  pgReplicasPerOsd,
   poolIssues,
   suggestPgNum,
+  usesPgNum,
 } from './pool'
 import { decodeState, defaultState, encodeState, sanitizePool } from './urlState'
 
@@ -34,10 +37,31 @@ describe('pool options', () => {
     expect(isValidName('')).toBe(false)
   })
 
-  it('suggests a power-of-two pg_num (round up when >25% above the lower power)', () => {
-    expect(suggestPgNum(40, rep3)).toBe(2048) // 40*100/3 ≈ 1333 → 1024 + 30% → 2048
-    expect(suggestPgNum(40, ec42)).toBe(1024) // 667 → 512 + 30% → 1024
-    expect(suggestPgNum(8, rep3)).toBe(256) // 267 → 256 + 4% → 256
+  it('rounds to the nearest power of two like the autoscaler', () => {
+    expect(nearestPowerOfTwo(2667)).toBe(2048) // 619 above 2048, 1429 below 4096
+    expect(nearestPowerOfTwo(200)).toBe(256) // 72 above 128, 56 below 256
+    expect(nearestPowerOfTwo(1333)).toBe(1024)
+    expect(nearestPowerOfTwo(192)).toBe(256) // halfway goes up
+    expect(nearestPowerOfTwo(1024)).toBe(1024)
+    expect(nearestPowerOfTwo(0.5)).toBe(1)
+  })
+
+  it('suggests the pg_num the autoscaler aims for: target PG replicas per OSD × OSDs ÷ width', () => {
+    expect(suggestPgNum(40, rep3)).toBe(1024) // 40 × 100 ÷ 3 = 1333 (Ceph's default target up to Tentacle)
+    expect(suggestPgNum(40, rep3, 200)).toBe(2048) // 2667 (Ceph's development branch)
+    expect(suggestPgNum(8, ec42)).toBe(128) // 8 × 100 ÷ 6 = 133
+    expect(suggestPgNum(10_000, rep3)).toBe(32768) // capped
+    expect(pgReplicasPerOsd(2048, rep3, 40)).toBeCloseTo(153.6, 9)
+  })
+
+  it("starts with Ceph's default pg_num and uses it with the autoscaler off or warning", () => {
+    expect(defaultPoolOptions().pgNum).toBe(32)
+    expect(usesPgNum({ autoscaleMode: 'on' })).toBe(false)
+    expect(usesPgNum({ autoscaleMode: 'warn' })).toBe(true)
+    expect(poolIssues({ ...defaultPoolOptions(), autoscaleMode: 'warn', pgNum: 100 }, rep3)).toEqual([
+      'pg_num should be a power of two.',
+    ])
+    expect(poolIssues({ ...defaultPoolOptions(), autoscaleMode: 'on', pgNum: 100 }, rep3)).toEqual([])
   })
 
   it('reports pool issues', () => {

@@ -18,26 +18,27 @@ Source: <https://github.com/cytrinox/ceph-calc>
   pool layout, recovery reserve and Ceph's default fill ratios.
 - Miscellaneous (step 5, optional): a price per TB of raw drive capacity, empty by default, with a free-text
   currency that starts as the browser locale's symbol (`€`, `$`, `£`, `CHF`, …); once a price is set, the Real net
-  capacity card shows the cluster's drive cost and the cost per usable TB. "Create virtual CRUSH map" adds a panel
-  below the layout comparison with the output `ceph osd crush tree` would print for the hardware: every `×N` copy
-  and OSD as its own item with Ceph-style IDs, names and weights (TiB), optionally with the shadow trees per device
-  class (`--show-shadow`), and a button that copies the whole tree. Large trees show their first 500 rows each. A
-  CRUSH bucket weighs at most 65,536 TiB (32-bit fixed point); when the hardware exceeds that with Ceph's default
-  weights (TiB), a warning appears and the recommendations suggest `osd_crush_initial_weight = 1`.
+  capacity card shows the cluster's drive cost and the cost per usable TB. The PG target per OSD
+  (`mon_target_pg_per_osd`, default 100 like Ceph) drives the pg_num recommendation and is set on the cluster when
+  changed. "Create virtual CRUSH map" adds a panel below the layout comparison with the output `ceph osd crush tree`
+  would print for the hardware: every `×N` copy and OSD as its own item with Ceph-style IDs, names and weights
+  (TiB), optionally with the shadow trees per device class (`--show-shadow`), and a button that copies the whole
+  tree. Large trees show their first 500 rows each. A CRUSH bucket weighs at most 65,536 TiB (32-bit fixed point);
+  when the hardware exceeds that with Ceph's default weights (TiB), a warning appears and the recommendations
+  suggest `osd_crush_initial_weight = 1`.
 - Pool schemes: replication (`size`, `min_size`) or erasure coding (`k`, `m`, and `min_size`, which defaults to
   Ceph's `k + min(1, m − 1)`), with common presets.
 - Headroom: recovery reserve (free space to recover the data of N failed failure domains, capped at the
   spare domains = domains − copies/shards per object) and the nearfull (0.85), backfillfull (0.90) and full
   (0.95) ratios. The ratios stay in order: raising one raises the ones above it, lowering one lowers the ones
   below it.
-- Pool configuration: pool name, application, CRUSH rule name, device class (built-in, used in the tree, or
-  custom), EC profile and plugin,
-  EC `technique` and `stripe_unit`, `allow_ec_overwrites`, `fast_read`, `allow_ec_optimizations` (Ceph
-  Tentacle), PG autoscaling, `pg_num` (with a
-  suggested value), `bulk`, `target_size_ratio` / `target_size_bytes`, compression (with an expected
-  compression ratio, default 0.90, shown as an effective-capacity badge), quotas, and the `nodelete` /
-  `nosizechange` flags. Leave the rule or profile name empty to get a derived name such as `rep3_host`
-  or `ec-4-2-rack-nvme`.
+- Pool configuration: pool name, application, CRUSH rule name, device class (built-in, used in the tree, or custom),
+  EC profile and plugin, EC `technique` and `stripe_unit`, `allow_ec_overwrites`, `fast_read`,
+  `allow_ec_optimizations` (Ceph Tentacle), PG autoscaling, `pg_num` for the autoscaler off or in warn mode (default
+  32 like Ceph; the recommendations suggest the value the autoscaler would aim for), `bulk`, `target_size_ratio` /
+  `target_size_bytes`, compression (with an expected compression ratio, default 0.90, shown as an effective-capacity
+  badge), quotas, and the `nodelete` / `nosizechange` flags. Leave the rule or profile name empty to get a derived
+  name such as `rep3_host` or `ec-4-2-rack-nvme`.
 - IOPS (also step 5, optional): a client I/O size (4K–1M) and, on the Advanced tab in one tab per device class of
   the tree (custom classes included; the Basic tab has one set without tabs), the random read and write IOPS of one
   OSD at that size give an estimated cluster ceiling for the selected layout (result card, with the arithmetic in
@@ -58,8 +59,9 @@ Source: <https://github.com/cytrinox/ceph-calc>
   applies these with an "Apply recommendations" toggle, one toggle per recommendation. Recommendations that change
   the setup itself (a recovery reserve of 1 instead of 0, 3 copies instead of 1, hosts instead of OSDs as failure
   domain, each with its cost in real net capacity; EC optimizations for an EC pool, with what they save in OSD
-  operations and IOPS, Ceph Tentacle or later) have an "Adopt recommendation" button: it changes the inputs, and the
-  recommendation is replaced by a short "Adopted" note that fades out.
+  operations and IOPS, Ceph Tentacle or later; the pg_num the autoscaler would aim for when the pool sets its own)
+  have an "Adopt recommendation" button: it changes the inputs, and the recommendation is replaced by a short
+  "Adopted" note that fades out.
 - Ceph commands panel: the full command sequence for the configuration (fill ratios, EC profile, CRUSH rule,
   pool create, size/min_size (replicated), EC options, autoscaler hints, compression, quotas, application,
   protection flags), with copy-all, per-section copy and download as a shell script. EC pools only get a

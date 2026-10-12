@@ -115,7 +115,7 @@ export function defaultPoolOptions(): PoolOptions {
     ecOverwrites: true,
     ecOptimizations: false,
     autoscaleMode: 'on',
-    pgNum: 128,
+    pgNum: DEFAULT_POOL_PG_NUM,
     bulk: false,
     targetSizeRatio: 0,
     targetSizeTB: 0,
@@ -158,13 +158,49 @@ export function effectiveProfileName(pool: PoolOptions, scheme: Scheme, domain: 
   return pool.ecProfile.trim() || defaultProfileName(scheme, domain, pool.deviceClass)
 }
 
-/** Classic sizing: ~100 PGs per OSD divided by the pool width, rounded to a power of two. */
-export function suggestPgNum(osdCount: number, scheme: Scheme, targetPerOsd = 100): number {
+/** Ceph's osd_pool_default_pg_num: pg_num of a new pool when none is given. */
+export const DEFAULT_POOL_PG_NUM = 32
+/**
+ * Ceph's mon_target_pg_per_osd: PG replicas per OSD the autoscaler aims for. 100 in every release up to Tentacle;
+ * the development branch raises it to 200 (commit d34fa3316f, after Tentacle).
+ */
+export const DEFAULT_PG_TARGET_PER_OSD = 100
+/** Upper bound of the PG target input (and of links). */
+export const MAX_PG_TARGET_PER_OSD = 1000
+/**
+ * Ceph's mon_max_pg_per_osd: with more PG replicas per OSD, pool creation fails. 250 up to Tentacle; the
+ * development branch raises it to 500 together with the PG target.
+ */
+export const MAX_PG_PER_OSD = 250
+/** The autoscaler's threshold: it changes pg_num, or warns in warn mode, only when off by more than this factor. */
+export const PG_AUTOSCALE_THRESHOLD = 3
+const MAX_PG_NUM = 32768
+
+/** The PG autoscaler sets pg_num (warn: only reports); otherwise pg_num is the pool's own. */
+export const usesPgNum = (pool: Pick<PoolOptions, 'autoscaleMode'>) => pool.autoscaleMode !== 'on'
+
+/** Ceph's nearest_power_of_two() (pg_autoscaler): the closer of the powers of two around n; ties go up. */
+export function nearestPowerOfTwo(n: number): number {
+  if (!(n > 1)) return 1
+  const upper = 2 ** Math.ceil(Math.log2(Math.floor(n)))
+  const lower = upper / 2
+  if (upper === Math.floor(n)) return upper
+  return upper - n > n - lower ? lower : upper
+}
+
+/**
+ * The pg_num Ceph's autoscaler would pick for a pool holding the cluster's data: `targetPerOsd` PG replicas per OSD,
+ * so OSDs × target ÷ pool width, as the nearest power of two.
+ */
+export function suggestPgNum(osdCount: number, scheme: Scheme, targetPerOsd = DEFAULT_PG_TARGET_PER_OSD): number {
   const width = Math.max(1, schemeWidth(scheme))
-  const raw = (Math.max(1, osdCount) * targetPerOsd) / width
-  const lower = 2 ** Math.floor(Math.log2(raw))
-  const pg = raw - lower > lower * 0.25 ? lower * 2 : lower
-  return Math.max(1, Math.min(pg, 32768))
+  const ideal = (Math.max(1, osdCount) * Math.max(1, targetPerOsd)) / width
+  return Math.max(1, Math.min(nearestPowerOfTwo(ideal), MAX_PG_NUM))
+}
+
+/** PG replicas (shards) each OSD holds: every PG is placed on `width` OSDs. */
+export function pgReplicasPerOsd(pgNum: number, scheme: Scheme, osdCount: number): number {
+  return osdCount > 0 ? (pgNum * schemeWidth(scheme)) / osdCount : 0
 }
 
 export function isPowerOfTwo(n: number): boolean {
@@ -206,7 +242,7 @@ export function poolIssues(pool: PoolOptions, scheme: Scheme): string[] {
   if (pool.autoscaleMode !== 'off' && pool.targetSizeRatio > 0 && pool.targetSizeTB > 0) {
     issues.push('Both target size ratio and bytes are set; Ceph uses the ratio.')
   }
-  if (pool.autoscaleMode === 'off' && !isPowerOfTwo(pool.pgNum)) {
+  if (usesPgNum(pool) && !isPowerOfTwo(pool.pgNum)) {
     issues.push('pg_num should be a power of two.')
   }
   return issues
