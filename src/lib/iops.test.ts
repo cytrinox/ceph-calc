@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { clusterIops, describeCost, estimateIops, explainIops, iopsBasis, opCosts, osdEquivalents, type OsdIops } from './iops'
+import { BASIC_IOPS, clusterIops, describeCost, estimateIops, explainIops, iopsBasis, opCosts, osdEquivalents, type OsdIops } from './iops'
 import { defaultPoolOptions } from './pool'
 import { buildBasicTopology, deviceClassUsage, newBucket, newOsdGroup, topologyStats, TOPOLOGY_EXAMPLES } from './topology'
 import type { Scheme } from './ceph'
@@ -165,6 +165,13 @@ describe('mixed device classes', () => {
     expect([r.read, r.write]).toEqual([null, null])
     expect(r.ops.read.missing).toEqual(['hdd'])
     expect(explainIops(r, 'read')).toBeNull()
+  })
+
+  it('treats the Basic tab as one set of values without a class', () => {
+    const basic = iopsBasis([{ cls: BASIC_IOPS, osd: { read: 200, write: 0 }, largestOsdTB: 8 }], 320)!
+    const r = estimateIops(basic, rep3, classic)
+    expect(explainIops(r, 'read')).toBe('40 OSDs × 200 IOPS ÷ 1 OSD read = 8,000')
+    expect(r.ops.write.missing).toEqual([BASIC_IOPS])
   })
 
   it('stays hidden until IOPS are entered for some class', () => {

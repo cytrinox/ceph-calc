@@ -35,7 +35,7 @@ import {
 } from './lib/topology'
 import { defaultState, readStateFromUrl, writeStateToUrl, type AppState } from './lib/urlState'
 import { channelTitle, versionLink } from './lib/version'
-import { estimateIops, hasIops, iopsBasis } from './lib/iops'
+import { BASIC_IOPS, estimateIops, hasIops, iopsBasis } from './lib/iops'
 import { recommendations, type SetupChange } from './lib/recommendations'
 
 // Same calculator pictogram as the favicon (served from public/).
@@ -50,16 +50,28 @@ const state = reactive<AppState>(readStateFromUrl() ?? defaultState())
 // device class, so they keep matching it in the tree.
 const seedFromBasic = () => buildBasicTopology(state.basic, state.pool.deviceClass || DEFAULT_OSD_CLASS)
 
+// The Basic tab's IOPS have no device class; the seeded tree's OSDs get one, so they take the values over (unless
+// that class has values already).
+function carryBasicIops() {
+  const basic = state.osdIops[BASIC_IOPS]
+  const cls = state.pool.deviceClass || DEFAULT_OSD_CLASS
+  if (basic && !state.osdIops[cls]) state.osdIops[cls] = { ...basic }
+}
+
 watch(
   () => state.tab,
   (tab) => {
-    if (tab === 'advanced' && !state.advanced) state.advanced = seedFromBasic()
+    if (tab === 'advanced' && !state.advanced) {
+      state.advanced = seedFromBasic()
+      carryBasicIops()
+    }
   },
   { immediate: true },
 )
 
 function resetFromBasic() {
   state.advanced = seedFromBasic()
+  carryBasicIops()
 }
 
 // "Reset" in the Cluster setup panel: the first-visit defaults (the panel asks first).
@@ -113,16 +125,21 @@ const tunables = computed(() => ({
 const result = computed(() => computeCapacity(input.value, state.scheme, tunables.value))
 
 // IOPS estimate (opt-in): per device class of the OSDs the rule uses, its per-OSD IOPS and its largest OSD.
-// Step 5 has a tab for every class in the tree.
-const iopsClasses = computed(() => treeClasses(topology.value))
+// Step 5 has a tab for every class in the Advanced tree; the Basic tab has one set of values without a class.
+const iopsClasses = computed(() => (state.tab === 'advanced' ? treeClasses(topology.value) : []))
 const iopsOf = (cls: string) => ({ read: num(state.osdIops[cls]?.read), write: num(state.osdIops[cls]?.write) })
 const iops = computed(() => {
+  const placedTB = poolStats.value.rawTB - domains.value.unplacedTB
+  if (state.tab === 'basic') {
+    const osd = iopsOf(BASIC_IOPS)
+    return iopsBasis([{ cls: BASIC_IOPS, osd, largestOsdTB: poolStats.value.largestOsdTB }], placedTB, state.ioSizeKiB)
+  }
   const usage = deviceClassUsage(poolTopology.value)
   const classes = sortDeviceClasses(Object.keys(usage))
     .filter((cls) => usage[cls].osds > 0)
     .map((cls) => ({ cls, osd: iopsOf(cls), largestOsdTB: usage[cls].largestTB }))
   const entered = iopsClasses.value.some((cls) => hasIops(iopsOf(cls)))
-  return iopsBasis(classes, poolStats.value.rawTB - domains.value.unplacedTB, state.ioSizeKiB, entered)
+  return iopsBasis(classes, placedTB, state.ioSizeKiB, entered)
 })
 const iopsEstimate = computed(() => (iops.value ? estimateIops(iops.value, state.scheme, state.pool) : null))
 

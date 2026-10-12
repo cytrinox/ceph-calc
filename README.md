@@ -38,10 +38,10 @@ Source: <https://github.com/cytrinox/ceph-calc>
   compression ratio, default 0.90, shown as an effective-capacity badge), quotas, and the `nodelete` /
   `nosizechange` flags. Leave the rule or profile name empty to get a derived name such as `rep3_host`
   or `ec-4-2-rack-nvme`.
-- IOPS (also step 5, optional): a client I/O size (4K–1M) and, in one tab per device class of the
-  hardware (custom classes included), the random read and write IOPS of one OSD at that size give an estimated
-  cluster ceiling for the selected layout (result card, with the arithmetic in the tooltip) and for every preset
-  (comparison table).
+- IOPS (also step 5, optional): a client I/O size (4K–1M) and, on the Advanced tab in one tab per device class of
+  the tree (custom classes included; the Basic tab has one set without tabs), the random read and write IOPS of one
+  OSD at that size give an estimated cluster ceiling for the selected layout (result card, with the arithmetic in
+  the tooltip) and for every preset (comparison table).
 - Raw data distribution bar: usable data, protection overhead, reserved headroom (kept free on purpose) and,
   when there is any, unusable space (yellow; can never be filled), with markers where a healthy cluster
   reaches the nearfull, backfillfull and full ratios. Below the usable share, `+X until backfillfull` /

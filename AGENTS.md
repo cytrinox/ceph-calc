@@ -145,9 +145,11 @@ IOPS    = min over the pool's classes c of N_eff,c / (reads / R_c + writes / W_c
           (R_c, W_c = per-OSD read / write IOPS of class c at the client I/O size, step 5)
 ```
 
-- **Device classes:** step 5 has one tab per class in the tree (`treeClasses`; Basic: the rule's class or ssd, as
-  the Basic OSDs get it). `osdIops` maps class → values; classes without values have no entry (link key `io`:
-  `[sizeKiB, { class: [read, write] }]`). The basis takes the classes of the OSDs the rule uses (`poolTopology`) with
+- **Device classes:** on the Advanced tab step 5 has one tab per class in the tree (`treeClasses`). The Basic tab
+  shows no tabs: its OSDs have no class of their own, so its values live under `BASIC_IOPS` ('') and don't change
+  with the rule's class; seeding the tree ("From Basic", first switch) copies them to the seeded class unless it has
+  values. `osdIops` maps class → values; classes without values have no entry (link key `io`:
+  `[sizeKiB, { class: [read, write] }]`, '' allowed). The basis takes the classes of the OSDs the rule uses (`poolTopology`) with
   their largest OSD (`deviceClassUsage().largestTB`); the lowest class ceiling wins (`estimateOp`), and the tooltip
   names that class.
 

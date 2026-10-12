@@ -111,6 +111,12 @@ export interface IopsBasis {
 export const hasIops = (osd: OsdIops) => osd.read > 0 || osd.write > 0
 
 /**
+ * Key of the Basic tab's per-OSD IOPS in `osdIops`: Basic OSDs have no device class (they always match the rule), so
+ * their values don't depend on one. Seeding the Advanced tree carries them over to the seeded class.
+ */
+export const BASIC_IOPS = ''
+
+/**
  * The basis of the estimate: the device classes of the OSDs the pool uses, each with its per-OSD IOPS and its
  * largest OSD. Null while no IOPS are `entered` (for any class, also those the pool doesn't use): the estimate is
  * opt-in.

@@ -214,6 +214,11 @@ describe('topology', () => {
     const decoded = decodeState(encodeState(state))!
     expect(decoded.osdIops).toEqual({ ssd: { read: 5000, write: 10_000_000 }, 'fast-nvme': { read: 0, write: 800 } })
     expect(decoded.ioSizeKiB).toBe(64)
+    // the Basic tab's values have no class (empty key)
+    state.osdIops = { '': { read: 300, write: 100 } }
+    expect(packed(state).io).toEqual([64, { '': [300, 100] }])
+    expect(decodeState(encodeState(state))!.osdIops).toEqual({ '': { read: 300, write: 100 } })
+    state.osdIops = { ssd: { read: 5000, write: 99_000_000 }, 'fast-nvme': { read: 0, write: 800 } }
     // invalid class names from a link are dropped
     const p = packed(state)
     p.io[1]['bad name'] = [1, 1]

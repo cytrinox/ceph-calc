@@ -14,7 +14,7 @@ import {
 } from './pool'
 import { customEcMinSize, DEFAULT_RATIOS, defaultEcMinSize, type Scheme } from './ceph'
 import { CURRENCY_MAX_LENGTH, DEFAULT_PRICE_PER_TB, localCurrency } from './pricing'
-import { DEFAULT_IO_SIZE_KIB, IO_SIZES_KIB, MAX_OSD_IOPS, type OsdIops } from './iops'
+import { BASIC_IOPS, DEFAULT_IO_SIZE_KIB, IO_SIZES_KIB, MAX_OSD_IOPS, type OsdIops } from './iops'
 import {
   ALL_DOMAIN_TYPES,
   BUCKET_TYPES,
@@ -103,10 +103,13 @@ interface Packed {
 
 const iops = (value: unknown) => Math.min(MAX_OSD_IOPS, int(value))
 
+/** IOPS keys: device class names, or the Basic tab's class-less values. */
+const isIopsKey = (key: string) => key === BASIC_IOPS || isValidDeviceClass(key)
+
 /** Only classes with a value; nothing at all while no IOPS are set and the I/O size is the default. */
 function packIops(state: AppState): Pick<Packed, 'io'> {
   const classes = Object.entries(state.osdIops)
-    .filter(([cls, o]) => isValidDeviceClass(cls) && (iops(o.read) > 0 || iops(o.write) > 0))
+    .filter(([cls, o]) => isIopsKey(cls) && (iops(o.read) > 0 || iops(o.write) > 0))
     .map(([cls, o]): [string, [number, number]] => [cls, [iops(o.read), iops(o.write)]])
   if (classes.length === 0 && state.ioSizeKiB === DEFAULT_IO_SIZE_KIB) return {}
   return { io: [ioSize(state.ioSizeKiB), Object.fromEntries(classes)] }
@@ -116,7 +119,7 @@ function unpackIops(raw: unknown): Record<string, OsdIops> {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return {}
   const result: Record<string, OsdIops> = {}
   for (const [cls, value] of Object.entries(raw)) {
-    if (!isValidDeviceClass(cls) || !Array.isArray(value)) continue
+    if (!isIopsKey(cls) || !Array.isArray(value)) continue
     const osd = { read: iops(value[0]), write: iops(value[1]) }
     if (osd.read > 0 || osd.write > 0) result[cls] = osd
   }

@@ -14,7 +14,7 @@ import ToggleField from './ToggleField.vue'
 import { DEFAULT_RATIOS, defaultEcMinSize, linkRatios, ratiosOrdered, schemeMinSize, type FillRatios } from '@/lib/ceph'
 import { CUSTOM_EC, CUSTOM_REPLICATED, DEFAULT_PRESET_ID, PRESETS, schemeLabel, schemeSelection } from '@/lib/schemes'
 import { formatInt, formatIops } from '@/lib/format'
-import { IO_SIZES_KIB, MAX_OSD_IOPS, ioSizeLabel, type OsdIops } from '@/lib/iops'
+import { BASIC_IOPS, IO_SIZES_KIB, MAX_OSD_IOPS, ioSizeLabel, type OsdIops } from '@/lib/iops'
 import { CURRENCY_MAX_LENGTH, formatPrice } from '@/lib/pricing'
 import { DEFAULT_OSD_CLASS, TYPE_ID, plural, type DomainType, type TopologyExample } from '@/lib/topology'
 import { defaultState, encodeState, type AppState, type TopologyTab } from '@/lib/urlState'
@@ -156,19 +156,29 @@ const miscSummary = computed(() => {
   const st = props.state
   const value = (n: number) => (n > 0 ? formatIops(n) : '—')
   const price = st.pricePerTB > 0 ? `${formatPrice(st.pricePerTB, st.currency)}/TB` : 'no price'
-  const set = props.iopsClasses.filter((cls) => st.osdIops[cls])
-  const iops = set.length
-    ? `${ioSizeLabel(st.ioSizeKiB)} · ${set.map((cls) => `${cls} ${value(st.osdIops[cls].read)} / ${value(st.osdIops[cls].write)}`).join(' · ')} IOPS per OSD`
-    : 'no IOPS'
+  // Basic: one class-less set ("read 200 · write 150"); Advanced: per class ("ssd 50K / 20K · hdd 200 / 150").
+  const basic = st.tab === 'basic'
+  const set = basic ? [BASIC_IOPS].filter((key) => st.osdIops[key]) : props.iopsClasses.filter((cls) => st.osdIops[cls])
+  const values = (key: string) =>
+    basic
+      ? `read ${value(st.osdIops[key].read)} · write ${value(st.osdIops[key].write)}`
+      : `${key} ${value(st.osdIops[key].read)} / ${value(st.osdIops[key].write)}`
+  const iops = set.length ? `${ioSizeLabel(st.ioSizeKiB)} · ${set.map(values).join(' · ')} IOPS per OSD` : 'no IOPS'
   return [price, iops, ...(st.crushMap ? ['CRUSH map'] : [])].join(' · ')
 })
 
-// Per-OSD IOPS, one tab per device class. A class without values has no entry, so links stay short.
+// Per-OSD IOPS, one tab per device class of the Advanced tree; the Basic tab has one set without a class (no tabs).
+// A class without values has no entry, so links stay short.
 const iopsTab = ref('')
 const iopsClass = computed({
-  get: () => (props.iopsClasses.includes(iopsTab.value) ? iopsTab.value : (props.iopsClasses[0] ?? DEFAULT_OSD_CLASS)),
+  get: () => {
+    if (props.state.tab === 'basic') return BASIC_IOPS
+    return props.iopsClasses.includes(iopsTab.value) ? iopsTab.value : (props.iopsClasses[0] ?? DEFAULT_OSD_CLASS)
+  },
   set: (cls: string) => (iopsTab.value = cls),
 })
+// "one OSD" on the Basic tab, "one hdd OSD" on the Advanced tab.
+const iopsOsd = computed(() => (iopsClass.value === BASIC_IOPS ? 'one OSD' : `one ${iopsClass.value} OSD`))
 const iopsTabs = computed(() =>
   props.iopsClasses.map((cls) => {
     const osd = props.state.osdIops[cls]
@@ -414,7 +424,7 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
           </select>
           <span class="hint">Size of each client request; enter the per-OSD IOPS for this size</span>
         </label>
-        <TabGroup v-model="iopsClass" :tabs="iopsTabs" label="Device class" />
+        <TabGroup v-if="state.tab === 'advanced'" v-model="iopsClass" :tabs="iopsTabs" label="Device class" />
         <p v-if="iopsClassUnused" class="unused">
           The CRUSH rule only uses {{ iopsClassUnused }} OSDs (step 4): these values don't count for this pool.
         </p>
@@ -422,7 +432,7 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
           :key="`${iopsClass}-read`"
           v-model="readIops"
           label="Read IOPS"
-          :hint="`${ioSizeLabel(state.ioSizeKiB)} random reads one ${iopsClass} OSD sustains`"
+          :hint="`${ioSizeLabel(state.ioSizeKiB)} random reads ${iopsOsd} sustains`"
           :min="0"
           :max="MAX_OSD_IOPS"
           :step="100"
@@ -436,7 +446,7 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
           :key="`${iopsClass}-write`"
           v-model="writeIops"
           label="Write IOPS"
-          :hint="`${ioSizeLabel(state.ioSizeKiB)} random writes one ${iopsClass} OSD sustains`"
+          :hint="`${ioSizeLabel(state.ioSizeKiB)} random writes ${iopsOsd} sustains`"
           :min="0"
           :max="MAX_OSD_IOPS"
           :step="100"
@@ -446,7 +456,7 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
           Measure on the OSD itself with this block size (e.g. fio with
           <code>bs={{ ioSizeLabel(state.ioSizeKiB).toLowerCase() }}</code> against an OSD, or
           <code>ceph tell osd.N bench</code> for writes), so BlueStore overhead is included. Each device class has its
-          own values. Leave them all empty to hide the estimate.
+          own values (Advanced tab). Leave them all empty to hide the estimate.
         </p>
       </div>
 
