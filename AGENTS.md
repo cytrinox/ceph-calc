@@ -125,7 +125,10 @@ real net = placeable(domains − N largest) × nearfull × f
   - recovery reserve 0 → 1 (only with a spare domain);
   - replication size 1 → 3 (or 2 with only two domains);
   - failure domain OSDs → hosts (with several hosts). It keeps the recovery reserve, or lowers it as far as needed
-    when there are too few hosts for it.
+    when there are too few hosts for it;
+  - `allow_ec_optimizations` for EC pools without it (jerasure/isa with reed_sol_van only), raising `stripe_unit` to
+    16K; the change rows show the OSD operations per client op and, with IOPS set, the estimate. The details say
+    Tentacle (v20) or later and that it cannot be switched off. Adopted pool options are a `SetupChange.pool`.
 - **Severity:** `critical` (red warning sign before the headline) only when the current setup risks data loss, e.g.
   replication size 1; everything else is `info` (light bulb, the panel's colour).
 - **Collapsed by default:** each recommendation shows only its pictogram, headline, adopt button and chevron; the

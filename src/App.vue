@@ -233,6 +233,9 @@ const recommendationList = computed(() =>
     // While spreading across OSDs: the same topology spread across hosts, for the failure-domain recommendation.
     hostInput: state.failureDomain === 'osd' ? failureDomains(poolTopology.value, 'host') : undefined,
     crushOverflow: crushOverflow.value,
+    pool: state.pool,
+    ioSizeKiB: state.ioSizeKiB,
+    iops: iops.value,
   }),
 )
 
@@ -241,6 +244,7 @@ function adoptRecommendation(setup: SetupChange) {
   if (setup.recoveryReserve !== undefined) state.recoveryReserve = setup.recoveryReserve
   if (setup.scheme) state.scheme = { ...setup.scheme }
   if (setup.failureDomain) state.failureDomain = setup.failureDomain
+  if (setup.pool) Object.assign(state.pool, setup.pool)
 }
 
 // Effective capacity when the pool compresses data (only with compression enabled).

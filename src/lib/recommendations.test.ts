@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import { computeCapacity, DEFAULT_RATIOS, type CapacityInput, type Scheme, type Tunables } from './ceph'
 import { crushWeightOverflow } from './crushTree'
+import { iopsBasis } from './iops'
+import { defaultPoolOptions, type PoolOptions } from './pool'
 import { isApplicable, recommendations } from './recommendations'
 import { buildBasicTopology, buildExampleTopology, failureDomains, newBucket, newOsdGroup, TOPOLOGY_EXAMPLES, type DomainType } from './topology'
 
@@ -209,6 +211,72 @@ describe('CRUSH weight recommendation', () => {
 
   it('is not needed while the weights fit', () => {
     expect(ids(withOverflow(buildBasicTopology({ hosts: 5, osdsPerHost: 8, osdSizeTB: 8 })))).not.toContain('crush-initial-weight')
+  })
+})
+
+describe('EC optimizations recommendation', () => {
+  const ec42: Scheme = { kind: 'ec', k: 4, m: 2 }
+  const none = { ...ratios, recoveryReserve: 0 }
+  const ecRecs = (scheme: Scheme, pool: Partial<PoolOptions> = {}, withIops = false) => {
+    const input = hosts(8)
+    const result = computeCapacity(input, scheme, none)
+    // 64 OSDs of 8 TB, 200 IOPS each
+    const iops = withIops ? iopsBasis([{ cls: 'ssd', osd: { read: 200, write: 200 }, largestOsdTB: 8 }], 512, 4) : null
+    return recommendations({
+      input,
+      result,
+      tunables: none,
+      scheme,
+      domain: 'host',
+      pool: { ...defaultPoolOptions(), ...pool },
+      ioSizeKiB: 4,
+      iops,
+    })
+  }
+  const find = (list: ReturnType<typeof ecRecs>) => list.find((r) => r.id === 'ec-optimizations')
+
+  it('recommends allow_ec_optimizations with the 16K stripe_unit for a classic EC pool', () => {
+    const rec = find(ecRecs(ec42))!
+    expect(rec.title).toBe('Enable EC optimizations')
+    expect(rec.severity).toBe('info')
+    expect(rec.changes).toMatchObject([
+      {
+        parameter: 'allow_ec_optimizations (step 4)',
+        from: 'false',
+        to: 'true',
+        fromNote: '4K: read 4 OSD reads, write 4 reads + 6 writes',
+        toNote: '4K: read 1 OSD read, write 3 reads + 3 writes',
+      },
+      { parameter: 'stripe_unit (step 4)', from: '4K', to: '16K' },
+    ])
+    expect(rec.details.join(' ')).toContain('Only available from Ceph Tentacle (v20) on')
+    expect(rec.details.join(' ')).toContain('cannot be switched off')
+    expect(rec.adopt).toEqual({
+      summary: 'EC optimizations, stripe_unit 16K',
+      setup: { pool: { ecOptimizations: true, stripeUnitKiB: 16 } },
+    })
+    expect(isApplicable(rec)).toBe(false)
+  })
+
+  it('shows the IOPS it gains when per-OSD IOPS are set', () => {
+    const rec = find(ecRecs(ec42, {}, true))!
+    // 64 OSDs × 200: classic 3,200 read / 1,280 write; optimized 12,800 / 2,133
+    expect(rec.changes[0].fromNote).toBe('4K: read 4 OSD reads, write 4 reads + 6 writes; 3.2K / 1.28K IOPS')
+    expect(rec.changes[0].toNote).toBe('4K: read 1 OSD read, write 3 reads + 3 writes; 12.8K / 2.13K IOPS')
+  })
+
+  it('keeps a stripe_unit of 16K or more', () => {
+    const rec = find(ecRecs(ec42, { stripeUnitKiB: 64 }))!
+    expect(rec.changes).toHaveLength(1)
+    expect(rec.adopt).toEqual({ summary: 'EC optimizations', setup: { pool: { ecOptimizations: true } } })
+  })
+
+  it('is only for EC pools whose plugin supports it and that do not have it yet', () => {
+    expect(find(ecRecs(rep3))).toBeUndefined()
+    expect(find(ecRecs(ec42, { ecOptimizations: true, stripeUnitKiB: 16 }))).toBeUndefined()
+    expect(find(ecRecs(ec42, { ecPlugin: 'clay' }))).toBeUndefined()
+    expect(find(ecRecs(ec42, { ecTechnique: 'cauchy_good' }))).toBeUndefined()
+    expect(find(ecRecs(ec42, { ecPlugin: 'isa' }))).toBeDefined()
   })
 })
 

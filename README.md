@@ -57,8 +57,9 @@ Source: <https://github.com/cytrinox/ceph-calc>
   of the commands) and `mon_warn_on_pool_no_redundancy false` against the permanent HEALTH_WARN. The commands panel
   applies these with an "Apply recommendations" toggle, one toggle per recommendation. Recommendations that change
   the setup itself (a recovery reserve of 1 instead of 0, 3 copies instead of 1, hosts instead of OSDs as failure
-  domain, each with its cost in real net capacity) have an "Adopt recommendation" button: it changes the inputs, and
-  the recommendation is replaced by a short "Adopted" note that fades out.
+  domain, each with its cost in real net capacity; EC optimizations for an EC pool, with what they save in OSD
+  operations and IOPS, Ceph Tentacle or later) have an "Adopt recommendation" button: it changes the inputs, and the
+  recommendation is replaced by a short "Adopted" note that fades out.
 - Ceph commands panel: the full command sequence for the configuration (fill ratios, EC profile, CRUSH rule,
   pool create, size/min_size (replicated), EC options, autoscaler hints, compression, quotas, application,
   protection flags), with copy-all, per-section copy and download as a shell script. EC pools only get a

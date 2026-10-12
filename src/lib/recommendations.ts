@@ -5,7 +5,9 @@
 
 import { computeCapacity, type CapacityInput, type CapacityResult, type Scheme, type Tunables } from './ceph'
 import { CRUSH_WEIGHT_MAX, initialWeightFor, type CrushWeightOverflow } from './crushTree'
-import { formatInt, formatPct } from './format'
+import { formatInt, formatIops, formatPct } from './format'
+import { describeCost, estimateIops, ioSizeLabel, opCosts, type IopsBasis, type OpCosts } from './iops'
+import { EC_OPTIMIZATION_PLUGINS, type PoolOptions } from './pool'
 import { PRESETS } from './schemes'
 import { plural, type DomainType } from './topology'
 import { formatCapacity } from './units'
@@ -29,6 +31,12 @@ export interface RecommendationInput {
   hostInput?: CapacityInput
   /** Set when CRUSH can't hold the hardware with its default weights (see `crushWeightOverflow`). */
   crushOverflow?: CrushWeightOverflow | null
+  /** Pool options (step 4), for recommendations about them. */
+  pool?: PoolOptions
+  /** Client I/O size of the IOPS estimate (step 5), in KiB. */
+  ioSizeKiB?: number
+  /** IOPS basis when per-OSD IOPS are set, to show what a change does to the estimate. */
+  iops?: IopsBasis | null
 }
 
 export type MarkerKind = 'nearfull' | 'backfillfull' | 'full' | 'recommended'
@@ -38,6 +46,7 @@ export interface SetupChange {
   recoveryReserve?: number
   scheme?: Scheme
   failureDomain?: DomainType
+  pool?: Partial<PoolOptions>
 }
 
 /** "Switch parameter X from A to B", with short notes and optional ratio markers. */
@@ -395,6 +404,84 @@ export function crushWeightRecommendation({ crushOverflow }: RecommendationInput
   }
 }
 
+/** Ceph's recommended minimum stripe_unit with EC optimizations, in KiB. */
+const EC_OPTIMIZED_STRIPE_UNIT_KIB = 16
+
+/**
+ * allow_ec_optimizations for an EC pool without it (Ceph Tentacle or later): partial reads and writes for small
+ * I/O. Only for the plugins and technique that support it; raises stripe_unit to Ceph's recommended 16K.
+ */
+export function ecOptimizationsRecommendation({
+  scheme,
+  pool,
+  ioSizeKiB,
+  iops,
+}: RecommendationInput): Recommendation | null {
+  if (scheme.kind !== 'ec' || !pool || pool.ecOptimizations) return null
+  if (!EC_OPTIMIZATION_PLUGINS.includes(pool.ecPlugin) || pool.ecTechnique !== 'reed_sol_van') return null
+  const { k, m } = scheme
+  const size = ioSizeKiB ?? iops?.ioSizeKiB ?? 4
+  const stripeUnitKiB = Math.max(pool.stripeUnitKiB, EC_OPTIMIZED_STRIPE_UNIT_KIB)
+  const raiseStripeUnit = stripeUnitKiB !== pool.stripeUnitKiB
+  const optimized = { ...pool, ecOptimizations: true, stripeUnitKiB }
+  // OSD operations per client read and write, and the IOPS they allow when per-OSD IOPS are set.
+  const effect = (options: PoolOptions, costs: OpCosts) => {
+    const ops = `${ioSizeLabel(size)}: read ${describeCost(costs.read)}, write ${describeCost(costs.write)}`
+    const estimate = iops ? estimateIops(iops, scheme, options) : null
+    return estimate && estimate.read !== null && estimate.write !== null
+      ? `${ops}; ${formatIops(estimate.read)} / ${formatIops(estimate.write)} IOPS`
+      : ops
+  }
+  const changes: SettingChange[] = [
+    {
+      parameter: 'allow_ec_optimizations (step 4)',
+      from: 'false',
+      fromNote: effect(pool, opCosts(scheme, pool, size)),
+      to: 'true',
+      toNote: effect(optimized, opCosts(scheme, optimized, size)),
+    },
+  ]
+  if (raiseStripeUnit) {
+    changes.push({
+      parameter: 'stripe_unit (step 4)',
+      from: ioSizeLabel(pool.stripeUnitKiB),
+      fromNote: 'Ceph default',
+      to: ioSizeLabel(stripeUnitKiB),
+      toNote: "Ceph's recommendation with EC optimizations",
+    })
+  }
+  const details = [
+    `Classic EC works on whole stripes: a small read fetches all ${k} data shards, and a small write reads them ` +
+      `and rewrites all ${k + m} shards (read-modify-write). That is why EC pools are slow for small random I/O.`,
+    'With allow_ec_optimizations Ceph reads only the shards that hold the requested data, and a small write ' +
+      'updates just the changed data shards and the parity (parity-delta or partial writes, whichever reads ' +
+      'less). Small reads and writes need far fewer OSD operations: higher IOPS, lower latency and less load on ' +
+      'the OSDs and the network, which makes EC pools better suited for RBD and CephFS.',
+    'Only available from Ceph Tentacle (v20) on, for the jerasure and isa plugins with reed_sol_van; the whole ' +
+      'cluster must run Tentacle. Once enabled on a pool it cannot be switched off.',
+  ]
+  if (raiseStripeUnit) {
+    details.push(
+      `Ceph recommends a stripe_unit of at least ${ioSizeLabel(EC_OPTIMIZED_STRIPE_UNIT_KIB)} with EC ` +
+        'optimizations: medium-sized requests then touch fewer shards. stripe_unit is part of the EC profile, so it ' +
+        'is set when the pool is created.',
+    )
+  }
+  return {
+    id: 'ec-optimizations',
+    severity: 'info',
+    title: 'Enable EC optimizations',
+    changes,
+    details,
+    adopt: raiseStripeUnit
+      ? {
+          summary: `EC optimizations, stripe_unit ${ioSizeLabel(stripeUnitKiB)}`,
+          setup: { pool: { ecOptimizations: true, stripeUnitKiB } },
+        }
+      : { summary: 'EC optimizations', setup: { pool: { ecOptimizations: true } } },
+  }
+}
+
 export function recommendations(input: RecommendationInput): Recommendation[] {
   return [
     replicationRecommendation(input),
@@ -403,5 +490,6 @@ export function recommendations(input: RecommendationInput): Recommendation[] {
     crushWeightRecommendation(input),
     recoveryReserveRecommendation(input),
     nearfullRecommendation(input),
+    ecOptimizationsRecommendation(input),
   ].filter((r): r is Recommendation => r !== null)
 }
