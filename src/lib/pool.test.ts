@@ -45,6 +45,10 @@ describe('pool options', () => {
     const issues = poolIssues(pool, ec42)
     expect(issues).toHaveLength(3)
     expect(poolIssues(defaultPoolOptions(), rep3)).toEqual([])
+    expect(poolIssues({ ...defaultPoolOptions(), deviceClass: 'fast-ssd' }, rep3)).toEqual([])
+    expect(poolIssues({ ...defaultPoolOptions(), deviceClass: 'fast ssd' }, rep3)).toEqual([
+      'Device class: use letters, digits, ".", "_" or "-".',
+    ])
   })
 
   it('checks EC technique against plugin and m', () => {
@@ -102,8 +106,10 @@ describe('pool options', () => {
       stripeUnitKiB: 64,
       fastRead: true,
       targetSizeTB: 250,
+      deviceClass: 'fast-ssd',
     }
     expect(decodeState(encodeState(state))!.pool).toEqual(state.pool)
+    expect(sanitizePool({ deviceClass: 'x; rm -rf /' }).deviceClass).toBe('')
     const dirty = sanitizePool({ name: 42, application: 'evil', pgNum: -5, bulk: 'yes', stripeUnitKiB: 3, ecTechnique: 'x', compressionRatio: -1 })
     expect(dirty.compressionRatio).toBe(0.9)
     expect(dirty.stripeUnitKiB).toBe(4)

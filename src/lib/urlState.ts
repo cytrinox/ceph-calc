@@ -6,7 +6,6 @@ import {
   AUTOSCALE_MODES,
   COMPRESSION_ALGORITHMS,
   COMPRESSION_MODES,
-  DEVICE_CLASSES,
   EC_PLUGINS,
   EC_TECHNIQUES,
   STRIPE_UNITS_KIB,
@@ -19,8 +18,10 @@ import { DEFAULT_IO_SIZE_KIB, IO_SIZES_KIB, MAX_OSD_IOPS } from './iops'
 import {
   ALL_DOMAIN_TYPES,
   BUCKET_TYPES,
+  DEFAULT_OSD_CLASS,
   TYPE_ID,
   int,
+  isValidDeviceClass,
   num,
   uid,
   type BasicTopology,
@@ -73,8 +74,9 @@ export function defaultState(): AppState {
   }
 }
 
-// Bucket as [typeId, name, count, children, osds[[count, sizeTB]]]
-type PackedBucket = [number, string, number, PackedBucket[], [number, number][]]
+// Bucket as [typeId, name, count, children, osds[[count, sizeTB, deviceClass?]]]; the class only when not ssd.
+type PackedOsdGroup = [number, number] | [number, number, string]
+type PackedBucket = [number, string, number, PackedBucket[], PackedOsdGroup[]]
 
 interface Packed {
   v: 1
@@ -139,7 +141,10 @@ export function sanitizePool(raw: unknown): PoolOptions {
     name: str(r.name, d.name),
     application: pick(APPLICATIONS, r.application, d.application),
     crushRule: str(r.crushRule, d.crushRule),
-    deviceClass: pick(DEVICE_CLASSES, r.deviceClass, d.deviceClass),
+    deviceClass:
+      typeof r.deviceClass === 'string' && (r.deviceClass === '' || isValidDeviceClass(r.deviceClass))
+        ? r.deviceClass
+        : d.deviceClass,
     ecProfile: str(r.ecProfile, d.ecProfile),
     ecPlugin: pick(EC_PLUGINS, r.ecPlugin, d.ecPlugin),
     ecTechnique: pick(EC_TECHNIQUES, r.ecTechnique, d.ecTechnique),
@@ -173,7 +178,9 @@ function packBucket(b: Bucket): PackedBucket {
     b.name,
     int(b.count),
     b.children.map(packBucket),
-    b.osds.map((o) => [int(o.count), num(o.sizeTB)]),
+    b.osds.map((o): PackedOsdGroup =>
+      o.deviceClass === DEFAULT_OSD_CLASS ? [int(o.count), num(o.sizeTB)] : [int(o.count), num(o.sizeTB), o.deviceClass],
+    ),
   ]
 }
 
@@ -196,7 +203,12 @@ function unpackBucket(p: PackedBucket, parentId: number): Bucket | null {
             .filter((c): c is Bucket => c !== null),
     osds:
       type === 'host' && Array.isArray(p[4])
-        ? p[4].map((o) => ({ id: uid(), count: int(o?.[0]), sizeTB: num(o?.[1]) }))
+        ? p[4].map((o) => ({
+            id: uid(),
+            count: int(o?.[0]),
+            sizeTB: num(o?.[1]),
+            deviceClass: typeof o?.[2] === 'string' && isValidDeviceClass(o[2]) ? o[2] : DEFAULT_OSD_CLASS,
+          }))
         : [],
   }
 }

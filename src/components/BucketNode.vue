@@ -1,11 +1,13 @@
 <script setup lang="ts">
 import { computed, inject, ref } from 'vue'
 import AppIcon from './AppIcon.vue'
+import DeviceClassSelect from './DeviceClassSelect.vue'
 import MiniStepper from './MiniStepper.vue'
 import { formatInt, formatTB } from '@/lib/format'
 import {
   ALL_DOMAIN_TYPES,
   BUCKET_TYPES,
+  OSD_CLASSES,
   SPLIT_LIMIT,
   TYPE_ID,
   bucketStats,
@@ -22,7 +24,7 @@ import {
   type Bucket,
   type BucketType,
 } from '@/lib/topology'
-import { USED_NAMES_KEY } from './treeContext'
+import { DEVICE_CLASSES_KEY, USED_NAMES_KEY } from './treeContext'
 
 const props = defineProps<{
   bucket: Bucket
@@ -33,6 +35,7 @@ const props = defineProps<{
 }>()
 
 const usedNames = inject(USED_NAMES_KEY, () => new Set<string>())
+const deviceClasses = inject(DEVICE_CLASSES_KEY, computed(() => [...OSD_CLASSES]))
 
 const isHost = computed(() => props.bucket.type === 'host')
 const open = ref(props.depth < 2 && props.bucket.children.length <= 10)
@@ -176,6 +179,7 @@ const hasBody = computed(() => (isHost.value ? true : props.bucket.children.leng
           <MiniStepper v-model="osd.count" label="OSD count" />
           <span class="times">×</span>
           <MiniStepper v-model="osd.sizeTB" label="OSD size in TB" unit="TB" :integer="false" snap width="3.4rem" />
+          <DeviceClassSelect v-model="osd.deviceClass" label="Device class" :classes="deviceClasses" compact />
           <div class="actions">
             <button type="button" title="Duplicate OSD group" aria-label="Duplicate OSD group" @click="duplicateOsdGroup(i)">
               <AppIcon name="copy" />

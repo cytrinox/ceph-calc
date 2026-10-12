@@ -2,10 +2,9 @@
 // validation. commands.ts turns them into Ceph commands.
 
 import { schemeWidth, type Scheme } from './ceph'
-import type { DomainType } from './topology'
+import { isValidDeviceClass, type DomainType } from './topology'
 
 export const APPLICATIONS = ['rbd', 'cephfs', 'rgw', 'none'] as const
-export const DEVICE_CLASSES = ['', 'hdd', 'ssd', 'nvme'] as const
 export const AUTOSCALE_MODES = ['on', 'warn', 'off'] as const
 export const COMPRESSION_MODES = ['none', 'passive', 'aggressive', 'force'] as const
 export const COMPRESSION_ALGORITHMS = ['snappy', 'zlib', 'zstd', 'lz4'] as const
@@ -24,7 +23,6 @@ export const EC_TECHNIQUES = [
 export const STRIPE_UNITS_KIB = [4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096] as const
 
 export type Application = (typeof APPLICATIONS)[number]
-export type DeviceClass = (typeof DEVICE_CLASSES)[number]
 export type AutoscaleMode = (typeof AUTOSCALE_MODES)[number]
 export type CompressionMode = (typeof COMPRESSION_MODES)[number]
 export type CompressionAlgorithm = (typeof COMPRESSION_ALGORITHMS)[number]
@@ -56,8 +54,8 @@ export interface PoolOptions {
   application: Application
   /** CRUSH rule name; empty = derived from scheme and failure domain. */
   crushRule: string
-  /** Restrict placement to one device class; empty = any. */
-  deviceClass: DeviceClass
+  /** Restrict placement to one device class (built-in or custom); empty = any. */
+  deviceClass: string
   /** Erasure-code profile name; empty = derived. EC pools only. */
   ecProfile: string
   ecPlugin: EcPlugin
@@ -143,11 +141,11 @@ function schemeSlug(scheme: Scheme): string {
   return scheme.kind === 'replicated' ? `rep${scheme.size}` : `ec${scheme.k}-${scheme.m}`
 }
 
-export function defaultRuleName(scheme: Scheme, domain: DomainType, deviceClass: DeviceClass): string {
+export function defaultRuleName(scheme: Scheme, domain: DomainType, deviceClass: string): string {
   return [schemeSlug(scheme), domain, deviceClass].filter(Boolean).join('_')
 }
 
-export function defaultProfileName(scheme: Scheme, domain: DomainType, deviceClass: DeviceClass): string {
+export function defaultProfileName(scheme: Scheme, domain: DomainType, deviceClass: string): string {
   if (scheme.kind !== 'ec') return ''
   return ['ec', `${scheme.k}-${scheme.m}`, domain, deviceClass].filter(Boolean).join('-')
 }
@@ -178,6 +176,9 @@ export function poolIssues(pool: PoolOptions, scheme: Scheme): string[] {
   const issues: string[] = []
   if (!isValidName(pool.name)) issues.push('Pool name: use letters, digits, ".", "_" or "-".')
   if (pool.crushRule && !isValidName(pool.crushRule)) issues.push('CRUSH rule name contains invalid characters.')
+  if (pool.deviceClass && !isValidDeviceClass(pool.deviceClass)) {
+    issues.push('Device class: use letters, digits, ".", "_" or "-".')
+  }
   if (scheme.kind === 'ec' && pool.ecProfile && !isValidName(pool.ecProfile)) {
     issues.push('EC profile name contains invalid characters.')
   }

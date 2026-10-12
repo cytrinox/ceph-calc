@@ -8,20 +8,27 @@ import {
   BUCKET_TYPES,
   TOPOLOGY_EXAMPLES,
   collectNames,
+  deviceClassUsage,
   newBucket,
   nextFreeName,
+  OSD_CLASSES,
   plural,
+  sortDeviceClasses,
   topologyStats,
   type BucketType,
   type Topology,
   type TopologyExample,
 } from '@/lib/topology'
-import { USED_NAMES_KEY } from './treeContext'
+import { DEVICE_CLASSES_KEY, USED_NAMES_KEY } from './treeContext'
 
 const model = defineModel<Topology>({ required: true })
 const emit = defineEmits<{ resetFromBasic: []; exampleLoaded: [example: TopologyExample] }>()
 
 provide(USED_NAMES_KEY, () => collectNames(model.value))
+provide(
+  DEVICE_CLASSES_KEY,
+  computed(() => sortDeviceClasses([...OSD_CLASSES, ...Object.keys(deviceClassUsage(model.value))])),
+)
 
 const stats = computed(() => topologyStats(model.value))
 

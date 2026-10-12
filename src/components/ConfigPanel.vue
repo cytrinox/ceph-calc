@@ -22,6 +22,10 @@ const props = defineProps<{
   state: AppState
   domainOptions: DomainType[]
   osdCount: number
+  /** OSDs the CRUSH rule uses (its device class only), for the pg_num suggestion. */
+  poolOsdCount: number
+  /** Device classes used in the Advanced tree. */
+  treeClasses: string[]
   /** Failure domains in the topology. */
   domainCount: number
   /** Copies / shards per object. */
@@ -298,7 +302,8 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
         :pool="state.pool"
         :scheme="state.scheme"
         :domain="state.failureDomain"
-        :osd-count="osdCount"
+        :osd-count="poolOsdCount"
+        :tree-classes="treeClasses"
       />
     </StepSection>
 

@@ -18,8 +18,12 @@ import AppIcon from './components/AppIcon.vue'
 import { schemeLabel } from './lib/schemes'
 import {
   buildBasicTopology,
+  DEFAULT_OSD_CLASS,
+  deviceClassUsage,
   domainBalance,
   failureDomains,
+  filterDeviceClass,
+  sortDeviceClasses,
   UNBALANCED_SPREAD,
   num,
   plural,
@@ -40,17 +44,20 @@ const appVersionLink = appVersion ? versionLink(appVersion) : null
 
 const state = reactive<AppState>(readStateFromUrl() ?? defaultState())
 
-// Seed the advanced tree from the basic settings the first time it is opened.
+// Seed the advanced tree from the basic settings the first time it is opened. Basic OSDs match the CRUSH rule's
+// device class, so they keep matching it in the tree.
+const seedFromBasic = () => buildBasicTopology(state.basic, state.pool.deviceClass || DEFAULT_OSD_CLASS)
+
 watch(
   () => state.tab,
   (tab) => {
-    if (tab === 'advanced' && !state.advanced) state.advanced = buildBasicTopology(state.basic)
+    if (tab === 'advanced' && !state.advanced) state.advanced = seedFromBasic()
   },
   { immediate: true },
 )
 
 function resetFromBasic() {
-  state.advanced = buildBasicTopology(state.basic)
+  state.advanced = seedFromBasic()
 }
 
 const topology = computed(() =>
@@ -58,6 +65,15 @@ const topology = computed(() =>
 )
 
 const stats = computed(() => topologyStats(topology.value))
+
+// A CRUSH rule restricted to a device class only uses those OSDs (Advanced tab; Basic OSDs always match).
+const ruleClass = computed(() => (state.tab === 'advanced' ? state.pool.deviceClass : ''))
+const poolTopology = computed(() =>
+  ruleClass.value ? filterDeviceClass(topology.value, ruleClass.value) : topology.value,
+)
+const poolStats = computed(() => (ruleClass.value ? topologyStats(poolTopology.value) : stats.value))
+// OSDs and TB per device class in the Advanced tree (built-in and custom classes).
+const classUsage = computed(() => (state.tab === 'advanced' ? deviceClassUsage(topology.value) : {}))
 
 const domainOptions = computed<DomainType[]>(() =>
   state.tab === 'basic' ? ['osd', 'host'] : ['osd', ...presentTypes(topology.value)],
@@ -73,7 +89,7 @@ watch(
   { immediate: true },
 )
 
-const domains = computed(() => failureDomains(topology.value, state.failureDomain))
+const domains = computed(() => failureDomains(poolTopology.value, state.failureDomain))
 const input = computed(() => ({
   groups: domains.value.groups,
   unplacedTB: domains.value.unplacedTB,
@@ -91,21 +107,22 @@ const result = computed(() => computeCapacity(input.value, state.scheme, tunable
 const iops = computed(() =>
   iopsBasis(
     { read: num(state.osdReadIops), write: num(state.osdWriteIops) },
-    stats.value.rawTB - domains.value.unplacedTB,
-    stats.value.largestOsdTB,
+    poolStats.value.rawTB - domains.value.unplacedTB,
+    poolStats.value.largestOsdTB,
     state.ioSizeKiB,
   ),
 )
 const iopsEstimate = computed(() => (iops.value ? estimateIops(iops.value, state.scheme, state.pool) : null))
 
 const facts = computed(() => {
-  const s = stats.value
+  const s = poolStats.value
   const fd = state.failureDomain
   const reserve = tunables.value.recoveryReserve
   const list =
     state.tab === 'basic'
       ? [`${formatInt(s.counts.host)} × ${state.basic.osdsPerHost} OSDs × ${formatTB(state.basic.osdSizeTB)}`]
       : [`${formatInt(s.counts.host)} ${plural('host', s.counts.host)}`, `${formatInt(s.counts.osd)} ${plural('osd', s.counts.osd)}`]
+  if (ruleClass.value) list.push(`device class ${ruleClass.value}`)
   if (fd !== 'host' && fd !== 'osd') list.push(`${formatInt(result.value.domainCount)} ${plural(fd, result.value.domainCount)}`)
   const r = result.value
   const nf = r.fillRatios.nearfull.toFixed(2)
@@ -133,9 +150,21 @@ const warnings = computed(() => {
         : `min_size = k: after ${s.m} ${s.m === 1 ? 'failure' : 'failures'} the pool keeps accepting writes with no redundancy left; one more failure loses data.`,
     )
   }
-  if (fd === 'osd' && stats.value.counts.host === 1) {
+  if (ruleClass.value) {
+    const usage = classUsage.value
+    const others = sortDeviceClasses(Object.keys(usage)).filter((c) => c !== ruleClass.value && usage[c].osds > 0)
+    const osds = others.reduce((n, c) => n + usage[c].osds, 0)
+    if (osds > 0) {
+      const byClass = others.map((c) => `${formatInt(usage[c].osds)} ${c}`).join(', ')
+      const tb = others.reduce((sum, c) => sum + usage[c].tb, 0)
+      list.push(
+        `The CRUSH rule only uses ${ruleClass.value} OSDs: ${formatInt(osds)} ${plural('osd', osds)} of other device classes (${byClass}; ${formatCapacity(tb)}) are left out.`,
+      )
+    }
+  }
+  if (fd === 'osd' && poolStats.value.counts.host === 1) {
     list.push('Single host: OSD as failure domain only protects against drive failures; losing the host takes all data offline.')
-  } else if (fd === 'osd' && stats.value.counts.host > 1) {
+  } else if (fd === 'osd' && poolStats.value.counts.host > 1) {
     list.push('Failure domain osd: one host failure can take out several copies of the same object.')
   }
   if (r.valid && r.unusable.strandedTB > r.rawTB * 0.01) {
@@ -185,7 +214,7 @@ const recommendationList = computed(() =>
     scheme: state.scheme,
     domain: state.failureDomain,
     // While spreading across OSDs: the same topology spread across hosts, for the failure-domain recommendation.
-    hostInput: state.failureDomain === 'osd' ? failureDomains(topology.value, 'host') : undefined,
+    hostInput: state.failureDomain === 'osd' ? failureDomains(poolTopology.value, 'host') : undefined,
   }),
 )
 
@@ -272,6 +301,8 @@ watch(
         :state="state"
         :domain-options="domainOptions"
         :osd-count="stats.counts.osd"
+        :pool-osd-count="poolStats.counts.osd"
+        :tree-classes="Object.keys(classUsage)"
         :domain-count="result.domainCount"
         :width="result.width"
         @reset-from-basic="resetFromBasic"

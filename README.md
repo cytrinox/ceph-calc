@@ -10,7 +10,10 @@ Source: <https://github.com/cytrinox/ceph-calc>
 - **Advanced** topology: a full CRUSH tree with every default bucket type
   (`host`, `chassis`, `rack`, `row`, `pdu`, `pod`, `room`, `datacenter`, `zone`, `region`).
   Every bucket has a `×N` multiplier for identical copies plus duplicate/split/remove actions, and
-  hosts contain one or more OSD groups (`count × size`). Any bucket type can be the failure domain.
+  hosts contain one or more OSD groups (`count × size`, with a device class: hdd, ssd or nvme, default ssd, or a
+  custom class name). Any bucket type can be the failure domain. When the CRUSH rule is restricted to a device class (step 4), only OSDs of
+  that class and the buckets containing them count; the others are named in a callout. The Basic topology has no
+  device class: its OSDs always match the rule.
   **Examples** (from a small 4-host cluster to two datacenters) load a complete setup: topology, failure domain,
   pool layout, recovery reserve and Ceph's default fill ratios.
 - Miscellaneous (step 5, optional): a price per TB of raw drive capacity, empty by default, with a free-text
@@ -21,7 +24,8 @@ Source: <https://github.com/cytrinox/ceph-calc>
 - Headroom: recovery reserve (free space to recover the data of N failed failure domains, capped at the
   spare domains = domains − copies/shards per object) and the nearfull (0.85), backfillfull (0.90) and full
   (0.95) ratios.
-- Pool configuration: pool name, application, CRUSH rule name, device class, EC profile and plugin,
+- Pool configuration: pool name, application, CRUSH rule name, device class (built-in, used in the tree, or
+  custom), EC profile and plugin,
   EC `technique` and `stripe_unit`, `allow_ec_overwrites`, `fast_read`, `allow_ec_optimizations` (Ceph
   Tentacle), PG autoscaling, `pg_num` (with a
   suggested value), `bulk`, `target_size_ratio` / `target_size_bytes`, compression (with an expected

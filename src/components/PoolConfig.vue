@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue'
 import AppIcon from './AppIcon.vue'
+import DeviceClassSelect from './DeviceClassSelect.vue'
 import NumberField from './NumberField.vue'
 import SelectField from './SelectField.vue'
 import TextField from './TextField.vue'
@@ -21,18 +22,19 @@ import {
   type AutoscaleMode,
   type CompressionAlgorithm,
   type CompressionMode,
-  type DeviceClass,
   type EcPlugin,
   type EcTechnique,
   type PoolOptions,
 } from '@/lib/pool'
-import type { DomainType } from '@/lib/topology'
+import { OSD_CLASSES, sortDeviceClasses, type DomainType } from '@/lib/topology'
 
 const props = defineProps<{
   pool: PoolOptions
   scheme: Scheme
   domain: DomainType
   osdCount: number
+  /** Device classes used in the Advanced tree (custom ones become selectable). */
+  treeClasses: string[]
 }>()
 
 const applications: { value: Application; label: string }[] = [
@@ -42,12 +44,7 @@ const applications: { value: Application; label: string }[] = [
   { value: 'none', label: 'None / custom' },
 ]
 
-const deviceClasses: { value: DeviceClass; label: string }[] = [
-  { value: '', label: 'Any device' },
-  { value: 'hdd', label: 'hdd' },
-  { value: 'ssd', label: 'ssd' },
-  { value: 'nvme', label: 'nvme' },
-]
+const deviceClasses = computed(() => sortDeviceClasses([...OSD_CLASSES, ...props.treeClasses]))
 
 const plugins: { value: EcPlugin; label: string }[] = [
   { value: 'jerasure', label: 'jerasure' },
@@ -148,7 +145,7 @@ const safetySummary = computed(() => {
         :placeholder="ruleDefault"
         :invalid="!!pool.crushRule && !isValidName(pool.crushRule)"
       />
-      <SelectField v-model="pool.deviceClass" label="Device class" :options="deviceClasses" />
+      <DeviceClassSelect v-model="pool.deviceClass" label="Device class" any-label="Any device" :classes="deviceClasses" />
     </div>
     <p class="hint">
       The rule places one {{ isEc ? 'chunk' : 'copy' }} per {{ domain }} under root <code>default</code>. Leave
@@ -308,6 +305,8 @@ const safetySummary = computed(() => {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 0.75rem;
+  // A field that grows (the device class with its custom name) doesn't stretch its neighbour.
+  align-items: start;
 }
 
 .pair.wide-first {

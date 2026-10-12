@@ -80,6 +80,15 @@ real net = placeable(domains − N largest) × nearfull × f
   - EC defaults to Ceph's `k + min(1, m − 1)` (`defaultEcMinSize`) and can be changed between k and k+m. The scheme
     only carries `minSize` when it differs from the default (`customEcMinSize`), so presets still match and links
     stay short. Always read it through `schemeMinSize()`.
+- **Device classes** (Advanced tab only): OSD groups carry `deviceClass`: one of `OSD_CLASSES` (default ssd) or a
+  custom name (`isValidDeviceClass`: CRUSH name characters, no leading "-", at most 32). `DeviceClassSelect` offers
+  the built-in classes, custom ones already in the tree, and "custom…", which turns the dropdown into a text field
+  in place (Enter or blur turns it back, Escape cancels); step 4 uses it too, with "Any device". Links only keep valid names (else ssd, or any for the pool). A CRUSH rule
+  restricted to a class (step 4) computes on `filterDeviceClass()`: hosts keep only that class's OSDs, and buckets
+  that lose all their capacity through the filter are dropped (Ceph's empty shadow buckets). Buckets that were empty
+  already stay, so the filter never adds empty-domain warnings. Facts, IOPS and the pg_num suggestion use the
+  filtered tree; step 1's summary and the failure-domain options use the whole tree. Basic OSDs always match the
+  rule (no filter).
 - **"Not enough failure domains" wording** comes from `placementHint()` / `placementMessage()` only (e.g. "needs 8
   hosts (+ 2 recovery reserve)"). Don't build such sentences elsewhere.
 - **First visit:** Replication 3x, recovery reserve 0, ratios 0.85 / 0.90 / 0.95, no price and no IOPS (step 5
@@ -184,7 +193,8 @@ IOPS  = N_eff / (reads / R + writes / W)   (R, W = per-OSD read / write IOPS at 
 
 ### State, links and storage
 - **Shared links:** the whole configuration lives in the URL hash as base64url JSON (`#s=…`). Short keys are listed in
-  `urlState.ts`: `v t b a d s f bf nf r p pt cu io`.
+  `urlState.ts`: `v t b a d s f bf nf r p pt cu io`. OSD groups in the tree pack as `[count, sizeTB]`, plus the
+  device class when it isn't ssd (`[8, 16, 'hdd']`).
   - Clamp and validate on **both** encode and decode.
   - Share limits through constants, e.g. `CURRENCY_MAX_LENGTH`.
 - **FAQ links** use `openFaq()`, not `#fragment` links, because the hash holds the configuration.
@@ -193,7 +203,8 @@ IOPS  = N_eff / (reads / R + writes / W)   (R, W = per-OSD read / write IOPS at 
   `try/catch`.
 
 ### Topology editor
-- **"From Basic"** and the first switch to Advanced create one `host ×N`, not N separate hosts.
+- **"From Basic"** and the first switch to Advanced create one `host ×N`, not N separate hosts. Its OSD group gets
+  the CRUSH rule's device class (ssd for "Any device"), so the result doesn't change with the tab.
 - **Splitting** creates at most `SPLIT_LIMIT` (500) entries. The remainder stays as a count on the last entry, so
   capacity is never lost.
 - **Examples:** each entry in `TOPOLOGY_EXAMPLES` loads a complete setup: topology, failure domain, scheme and

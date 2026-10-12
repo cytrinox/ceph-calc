@@ -5,8 +5,12 @@ import {
   buildExampleTopology,
   childTypesFor,
   collectNames,
+  deviceClassUsage,
   duplicateBucket,
   failureDomains,
+  filterDeviceClass,
+  isValidDeviceClass,
+  sortDeviceClasses,
   newBucket,
   newOsdGroup,
   nextFreeName,
@@ -240,5 +244,82 @@ describe('topology', () => {
     expect(decoded.failureDomain).toBe('rack')
     expect(decoded.scheme).toEqual(state.scheme)
     expect(topologyStats(decoded.advanced!)).toEqual(topologyStats(state.advanced))
+  })
+})
+
+describe('device classes', () => {
+  // rack1: 3 ssd hosts + 1 mixed host; rack2: 2 hdd hosts; rack3: empty from the start
+  const tree = () => [
+    newBucket('rack', 'rack1', {
+      children: [
+        newBucket('host', 'ssd1', { count: 3, osds: [newOsdGroup(8, 4)] }),
+        newBucket('host', 'mixed1', { osds: [newOsdGroup(2, 4), newOsdGroup(6, 16, 'hdd')] }),
+      ],
+    }),
+    newBucket('rack', 'rack2', { children: [newBucket('host', 'hdd1', { count: 2, osds: [newOsdGroup(8, 16, 'hdd')] })] }),
+    newBucket('rack', 'rack3'),
+  ]
+
+  it('gives new OSD groups the ssd class and seeds basic hosts with a given class', () => {
+    expect(newOsdGroup().deviceClass).toBe('ssd')
+    expect(buildBasicTopology({ hosts: 3, osdsPerHost: 4, osdSizeTB: 8 })[0].osds[0].deviceClass).toBe('ssd')
+    expect(buildBasicTopology({ hosts: 3, osdsPerHost: 4, osdSizeTB: 8 }, 'hdd')[0].osds[0].deviceClass).toBe('hdd')
+  })
+
+  it('keeps only the OSDs of the rule class and the buckets that contain them', () => {
+    const ssd = filterDeviceClass(tree(), 'ssd')
+    // rack2 lost all its OSDs and is dropped; rack3 was empty already and stays
+    expect(ssd.map((b) => b.name)).toEqual(['rack1', 'rack3'])
+    expect(failureDomains(ssd, 'host').groups).toEqual([
+      { capTB: 32, mult: 3 },
+      { capTB: 8, mult: 1 },
+    ])
+    expect(failureDomains(ssd, 'rack')).toMatchObject({ groups: [{ capTB: 104, mult: 1 }], emptyDomains: 1 })
+    expect(failureDomains(filterDeviceClass(tree(), 'hdd'), 'host').groups).toEqual([
+      { capTB: 128, mult: 2 },
+      { capTB: 96, mult: 1 },
+    ])
+    // nothing of that class: only the bucket that was empty already remains
+    expect(filterDeviceClass(tree(), 'nvme').map((b) => b.name)).toEqual(['rack3'])
+  })
+
+  it('leaves the tree itself unchanged', () => {
+    const t = tree()
+    const before = topologyStats(t)
+    filterDeviceClass(t, 'hdd')
+    expect(topologyStats(t)).toEqual(before)
+  })
+
+  it('counts OSDs and capacity per class with multipliers', () => {
+    expect(deviceClassUsage(tree())).toEqual({
+      ssd: { osds: 26, tb: 104 },
+      hdd: { osds: 22, tb: 352 },
+    })
+  })
+
+  it('accepts custom device classes with valid CRUSH names', () => {
+    for (const name of ['fast', 'ssd-cache', 'tier_2', 'nvme.4k']) expect(isValidDeviceClass(name)).toBe(true)
+    for (const name of ['', '-x', 'a b', 'x;rm', 'é', 'x'.repeat(33)]) expect(isValidDeviceClass(name)).toBe(false)
+    const t = [...tree(), newBucket('host', 'fast1', { count: 2, osds: [newOsdGroup(4, 2, 'fast')] })]
+    expect(failureDomains(filterDeviceClass(t, 'fast'), 'host').groups).toEqual([{ capTB: 8, mult: 2 }])
+    expect(sortDeviceClasses(['fast', 'nvme', 'archive', 'hdd', 'fast'])).toEqual(['hdd', 'nvme', 'archive', 'fast'])
+  })
+
+  it('stores the class in shared links only when it is not ssd', () => {
+    const state = defaultState()
+    state.tab = 'advanced'
+    state.advanced = tree()
+    const encoded = encodeState(state)
+    const packed = JSON.parse(Buffer.from(encoded, 'base64url').toString())
+    expect(packed.a[0][3][1][4]).toEqual([[2, 4], [6, 16, 'hdd']])
+    const decoded = decodeState(encoded)!
+    expect(deviceClassUsage(decoded.advanced!)).toEqual(deviceClassUsage(state.advanced))
+    // custom classes survive, invalid names from a link fall back to ssd
+    packed.a[0][3][1][4][1][2] = 'tape'
+    const custom = decodeState(Buffer.from(JSON.stringify(packed)).toString('base64url'))!
+    expect(custom.advanced![0].children[1].osds[1].deviceClass).toBe('tape')
+    packed.a[0][3][1][4][1][2] = 'x; rm -rf /'
+    const tampered = decodeState(Buffer.from(JSON.stringify(packed)).toString('base64url'))!
+    expect(tampered.advanced![0].children[1].osds[1].deviceClass).toBe('ssd')
   })
 })

@@ -35,10 +35,38 @@ export const TYPE_ID: Record<DomainType, number> = {
 
 export const ALL_DOMAIN_TYPES: DomainType[] = ['osd', ...BUCKET_TYPES]
 
+/**
+ * Ceph's built-in device classes. Any other valid CRUSH name works as a custom class (`ceph osd crush
+ * set-device-class`); a CRUSH rule can be restricted to one class (step 4).
+ */
+export const OSD_CLASSES = ['hdd', 'ssd', 'nvme'] as const
+export const DEFAULT_OSD_CLASS = 'ssd'
+/** Longest custom device class accepted; Ceph sets no limit, this keeps the UI and links tidy. */
+export const DEVICE_CLASS_MAX_LENGTH = 32
+
+// Ceph allows letters, digits, "-", "_" and "."; a leading "-" would read as a CLI option.
+const DEVICE_CLASS_PATTERN = /^[A-Za-z0-9][A-Za-z0-9._-]*$/
+
+export function isValidDeviceClass(name: string): boolean {
+  return DEVICE_CLASS_PATTERN.test(name) && name.length <= DEVICE_CLASS_MAX_LENGTH
+}
+
+/** Distinct classes with Ceph's built-in ones first (in their usual order), then custom ones alphabetically. */
+export function sortDeviceClasses(classes: Iterable<string>): string[] {
+  const builtIn = OSD_CLASSES as readonly string[]
+  const unique = [...new Set(classes)]
+  return [
+    ...builtIn.filter((c) => unique.includes(c)),
+    ...unique.filter((c) => !builtIn.includes(c)).sort((a, b) => a.localeCompare(b)),
+  ]
+}
+
 export interface OsdGroup {
   id: string
   count: number
   sizeTB: number
+  /** Built-in (hdd, ssd, nvme) or custom device class. */
+  deviceClass: string
 }
 
 export interface Bucket {
@@ -83,8 +111,8 @@ export function plural(type: DomainType, n = 2): string {
   return type === 'chassis' ? 'chassis' : `${type}s`
 }
 
-export function newOsdGroup(count = 8, sizeTB = 8): OsdGroup {
-  return { id: uid(), count, sizeTB }
+export function newOsdGroup(count = 8, sizeTB = 8, deviceClass = DEFAULT_OSD_CLASS): OsdGroup {
+  return { id: uid(), count, sizeTB, deviceClass }
 }
 
 export function newBucket(type: BucketType, name: string, init: Partial<Bucket> = {}): Bucket {
@@ -250,6 +278,42 @@ export function topologyStats(topology: Topology): TreeStats {
   return stats
 }
 
+/**
+ * The part of the tree a CRUSH rule restricted to `deviceClass` uses: hosts keep only that class's OSD groups.
+ * Hosts and buckets that lose all their capacity through the filter are dropped, as Ceph's shadow buckets of the
+ * class are empty there. Buckets that were empty already stay, so their warnings don't change.
+ */
+export function filterDeviceClass(topology: Topology, deviceClass: string): Topology {
+  const keep = (b: Bucket): Bucket | null => {
+    if (b.type === 'host') {
+      const osds = b.osds.filter((o) => o.deviceClass === deviceClass)
+      return osdGroupsCapacity(b.osds) > 0 && osdGroupsCapacity(osds) === 0 ? null : { ...b, osds }
+    }
+    const children = b.children.map(keep).filter((c): c is Bucket => c !== null)
+    return b.children.length > 0 && children.length === 0 ? null : { ...b, children }
+  }
+  return topology.map(keep).filter((b): b is Bucket => b !== null)
+}
+
+export type DeviceClassUsage = Record<string, { osds: number; tb: number }>
+
+/** OSDs and raw capacity per device class used in the tree (bucket counts applied). */
+export function deviceClassUsage(topology: Topology): DeviceClassUsage {
+  const usage: DeviceClassUsage = {}
+  const visit = (b: Bucket, parentMult: number) => {
+    const mult = parentMult * int(b.count)
+    if (mult === 0) return
+    for (const o of b.osds) {
+      const u = (usage[o.deviceClass] ??= { osds: 0, tb: 0 })
+      u.osds += mult * int(o.count)
+      u.tb += mult * int(o.count) * num(o.sizeTB)
+    }
+    for (const c of b.children) visit(c, mult)
+  }
+  for (const b of topology) visit(b, 1)
+  return usage
+}
+
 /** Bucket types present in the tree, ordered by CRUSH type id. */
 export function presentTypes(topology: Topology): BucketType[] {
   const found = new Set<BucketType>()
@@ -344,12 +408,14 @@ export const UNBALANCED_SPREAD = 0.25
 // Builders
 
 /** The Basic hosts as one host ×N; split it in the tree to edit hosts individually. */
-export function buildBasicTopology(basic: BasicTopology): Topology {
+/** The Basic tab's hosts as a tree; `deviceClass` only matters once it seeds the Advanced tab. */
+export function buildBasicTopology(basic: BasicTopology, deviceClass = DEFAULT_OSD_CLASS): Topology {
   const hosts = int(basic.hosts)
   if (hosts === 0) return []
   // Pad like the names split copies get, e.g. host001 for 100+ hosts.
   const name = `host${'1'.padStart(Math.max(2, String(hosts).length), '0')}`
-  return [newBucket('host', name, { count: hosts, osds: [newOsdGroup(int(basic.osdsPerHost), num(basic.osdSizeTB))] })]
+  const osds = [newOsdGroup(int(basic.osdsPerHost), num(basic.osdSizeTB), deviceClass)]
+  return [newBucket('host', name, { count: hosts, osds })]
 }
 
 /** 2 datacenters: dc1 with 3 rows, dc2 with 7 rows; 20 racks/row, 20 hosts/rack, 10 × 16 TB/host. */
