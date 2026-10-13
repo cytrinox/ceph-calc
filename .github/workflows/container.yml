@@ -81,7 +81,7 @@ jobs:
           # CEPH_CALC_CHANNEL: release channel shown in the page; switch to stable when ready.
           build-args: |
             CEPH_CALC_GIT_DESCRIBE=${{ steps.version.outputs.describe }}
-            CEPH_CALC_CHANNEL=alpha
+            CEPH_CALC_CHANNEL=beta
           push: ${{ github.event_name != 'pull_request' }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
