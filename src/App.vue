@@ -235,7 +235,7 @@ const warnings = computed(() => {
     )
   }
   if (!ratiosOrdered(tunables.value)) {
-    list.push('Ratios out of order: Ceph requires nearfull ≤ backfillfull ≤ full.')
+    list.push('Ratios out of order: Ceph expects nearfull ≤ backfillfull ≤ full and reports HEALTH_ERR (OSD_OUT_OF_ORDER_FULL) otherwise.')
   }
   if (tunables.value.fullRatio > 0.95) {
     list.push('Full ratio above the Ceph default 0.95 leaves very little room for recovery.')

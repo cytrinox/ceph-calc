@@ -24,7 +24,7 @@ export const DEFAULT_RATIOS = { nearfull: 0.85, backfillfull: 0.9, full: 0.95 } 
 
 export type FillRatios = Pick<Tunables, 'nearfullRatio' | 'backfillfullRatio' | 'fullRatio'>
 
-/** Ceph requires nearfull ≤ backfillfull ≤ full. */
+/** nearfull ≤ backfillfull ≤ full: Ceph accepts other orders but reports HEALTH_ERR (OSD_OUT_OF_ORDER_FULL). */
 export function ratiosOrdered(t: FillRatios): boolean {
   return t.nearfullRatio <= t.backfillfullRatio && t.backfillfullRatio <= t.fullRatio
 }

@@ -381,7 +381,7 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
             <template #label-suffix><RatioMarker kind="full" :size="11" /></template>
           </NumberField>
           <p v-if="!ratiosOrdered(state)" class="ratio-error">
-            Ceph requires nearfull ≤ backfillfull ≤ full.
+            Ceph expects nearfull ≤ backfillfull ≤ full; other orders give HEALTH_ERR (OSD_OUT_OF_ORDER_FULL).
           </p>
         </div>
       </div>
