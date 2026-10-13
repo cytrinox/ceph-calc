@@ -218,7 +218,7 @@ const ecDoc = helpDocs.find((d) => d.name === 'ec-sharding-and-iops')
               </tr>
               <tr>
                 <th scope="row">EC k+m, optimized</th>
-                <td>d reads</td>
+                <td>d reads (k+m with <code>fast_read</code>)</td>
                 <td>min(d+m, k−d) reads + d+m writes</td>
               </tr>
               <tr>
@@ -235,8 +235,9 @@ const ecDoc = helpDocs.find((d) => d.name === 'ec-sharding-and-iops')
             or partial writes reads less.
           </p>
           <p>
-            <code>fast_read</code> lowers the latency of single reads (any k of the k+m replies are enough) but costs m
-            extra OSD reads per request, so the IOPS ceiling drops. With EC optimizations the estimate ignores it.
+            <code>fast_read</code> lowers the latency of single reads (any k of the k+m replies are enough) but reads
+            from every shard, so each request costs k+m OSD reads and the IOPS ceiling drops. That holds with EC
+            optimizations too: a 4K read then touches all k+m shards instead of one.
           </p>
           <p>
             <code>d</code> is the number of data shards a request touches: ⌈I/O size ÷ <code>stripe_unit</code>⌉, at

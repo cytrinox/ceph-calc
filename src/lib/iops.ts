@@ -66,12 +66,14 @@ export function opCosts(
  * OSD reads and writes per operation of `ioSizeKiB` on one object (requests aligned to their size;
  * strips of one shard are contiguous, so a shard counts once per request):
  * - replication: a read hits the primary only, a write goes to every copy;
- * - classic EC: a read fetches whole stripes (k shards, all k+m with fast_read); a write of part
- *   of a stripe reads the k data shards and rewrites all k+m (read-modify-write);
+ * - classic EC: a read fetches whole stripes (k shards); a write of part of a stripe reads the k
+ *   data shards and rewrites all k+m (read-modify-write);
  * - EC optimizations (allow_ec_optimizations, Tentacle): a read touches only the d data shards
  *   holding the data; a partial-stripe write uses parity-delta (d+m reads) or partial writes
  *   (k-d reads), whichever reads less, and writes the d changed data shards plus m parity shards;
- * - whole stripes are written without reading (k+m writes); a remainder beyond them is partial.
+ * - whole stripes are written without reading (k+m writes); a remainder beyond them is partial;
+ * - fast_read reads from every shard, optimized or not (ECCommon: redundant reads on all available
+ *   shards): k+m reads.
  */
 function objectOpCosts(scheme: Scheme, pool: IopsPoolOptions, ioSizeKiB: number): Omit<OpCosts, 'objects'> {
   if (scheme.kind === 'replicated') {
@@ -87,7 +89,7 @@ function objectOpCosts(scheme: Scheme, pool: IopsPoolOptions, ioSizeKiB: number)
     const d = shards(kib)
     return pool.ecOptimizations ? Math.max(0, Math.min(d + m, k - d)) : k
   }
-  const read = { reads: pool.ecOptimizations ? shards(size) : pool.fastRead ? k + m : k, writes: 0 }
+  const read = { reads: pool.fastRead ? k + m : pool.ecOptimizations ? shards(size) : k, writes: 0 }
   if (size >= width) {
     const rest = size % width
     return { read, write: { reads: rest === 0 ? 0 : partialReads(rest), writes: k + m } }

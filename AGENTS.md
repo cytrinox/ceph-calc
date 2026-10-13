@@ -171,7 +171,8 @@ IOPS    = min over the pool's classes c of N_eff,c / (reads / R_c + writes / W_c
 - **OSD operations per client op** (`opCosts`; d = min(k, ⌈I/O size / stripe_unit⌉), requests aligned to their size):
   - replication: 1 read / n writes;
   - classic EC: k reads (k+m with `fast_read`) / k reads + k+m writes;
-  - `allow_ec_optimizations` (Tentacle): d reads / min(d+m, k−d) reads + d+m writes;
+  - `allow_ec_optimizations` (Tentacle): d reads (k+m with `fast_read`, which reads every shard in both paths) /
+    min(d+m, k−d) reads + d+m writes;
   - whole stripes (a multiple of k × stripe_unit): k+m writes and no reads; a remainder is a partial stripe.
 - **Checked against Ceph's FastEC table** (6+2, stripe_unit 16K: 4–16K writes 3r+3w, 32K writes 4r+4w); keep those
   test cases.

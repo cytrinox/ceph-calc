@@ -27,6 +27,8 @@ describe('opCosts', () => {
     // 2+2: a partial write reads the one other data shard
     expect(opCosts(ec(2, 2), optimized).write).toEqual({ reads: 1, writes: 3 })
     expect(opCosts(ec(4, 2), optimized).write).toEqual({ reads: 3, writes: 3 })
+    // fast_read reads from every shard in the optimized path too (ECCommon: redundant reads on all available shards)
+    expect(opCosts(ec(4, 2), { ...optimized, fastRead: true }).read).toEqual({ reads: 6, writes: 0 })
   })
 })
 

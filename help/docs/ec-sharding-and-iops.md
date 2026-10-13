@@ -51,7 +51,7 @@ optimizations** (`allow_ec_optimizations`, Ceph Tentacle or later, step 4):
 | --- | --- | --- |
 | Replication, size n | 1 read (primary) | n writes |
 | EC k+m | k reads (k+m with `fast_read`) | k reads + k+m writes |
-| EC k+m, optimized | d reads | min(d+m, k−d) reads + d+m writes |
+| EC k+m, optimized | d reads (k+m with `fast_read`) | min(d+m, k−d) reads + d+m writes |
 | EC, whole stripes | | k+m writes, no reads |
 
 **Classic EC** works on whole stripes. A read fetches the stripe from all k data shards, even if the client wants

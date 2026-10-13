@@ -125,7 +125,7 @@ OSD operations per client operation, with `d = min(k, ⌈I/O size ÷ stripe_unit
 | --- | --- | --- |
 | Replication, `size` n | 1 read | n writes |
 | EC k+m | k reads (k+m with `fast_read`) | k reads + k+m writes (read-modify-write) |
-| EC k+m with `allow_ec_optimizations` | d reads | min(d+m, k−d) reads + d+m writes |
+| EC k+m with `allow_ec_optimizations` | d reads (k+m with `fast_read`) | min(d+m, k−d) reads + d+m writes |
 | EC, whole stripes (a multiple of k × `stripe_unit`) | | k+m writes, no reads |
 
 With `R` / `W` the per-OSD read / write IOPS at the I/O size, `N_eff = placed capacity ÷ largest OSD` (CRUSH spreads I/O by
