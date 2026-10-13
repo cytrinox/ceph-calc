@@ -13,8 +13,8 @@ import UnitToggle from './components/UnitToggle.vue'
 import { computeCapacity, emptyDomainsWarning, placementMessage, ratiosOrdered, schemeMinSize, type Scheme } from './lib/ceph'
 import { CRUSH_WEIGHT_MAX, crushWeightOverflow, treeClasses } from './lib/crushTree'
 import { formatInt, formatPct, formatTB } from './lib/format'
-import { formatCapacity } from './lib/units'
-import { clusterPrice, formatPrice, pricePerUsableTB } from './lib/pricing'
+import { capacityUnit, formatCapacity, unitPerTB } from './lib/units'
+import { clusterPrice, formatPrice, pricePerUsable } from './lib/pricing'
 import { compressedCapacityTB } from './lib/pool'
 import AppIcon from './components/AppIcon.vue'
 import { schemeLabel } from './lib/schemes'
@@ -289,10 +289,13 @@ const price = computed(() => {
   if (perTB <= 0) return null
   const r = result.value
   const total = clusterPrice(r.rawTB, perTB)
-  const perUsable = r.valid ? pricePerUsableTB(total, r.usableTB) : null
+  // Per usable TB or TiB, following the unit toggle like the other outputs. The input stays per decimal TB of raw
+  // drive capacity (drives are sold that way), and so does the total's arithmetic in the tooltip.
+  const perUsable = r.valid ? pricePerUsable(total, r.usableTB * unitPerTB()) : null
   return {
     total: formatPrice(total, state.currency),
-    perUsableTB: perUsable === null ? null : formatPrice(perUsable, state.currency),
+    perUsable: perUsable === null ? null : formatPrice(perUsable, state.currency),
+    unit: capacityUnit.value,
     detail: `${formatTB(r.rawTB)} raw × ${formatPrice(perTB, state.currency)} per TB`,
   }
 })

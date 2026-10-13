@@ -18,7 +18,8 @@ const props = defineProps<{
   recoveryReserve: number
   warnings: string[]
   /** Cluster price label; null when no price per TB is set. */
-  price: { total: string; perUsableTB: string | null; detail: string } | null
+  /** `perUsable` is per usable `unit` (the TB/TiB toggle). */
+  price: { total: string; perUsable: string | null; unit: string; detail: string } | null
   /** Effective capacity with compression; null when compression is off. */
   compression: { effective: string; detail: string } | null
   /** 4k random IOPS estimate; null when no per-OSD IOPS are set. */
@@ -62,7 +63,7 @@ const usableParts = computed(() => {
           :title="`Drive cost: ${price.detail}`"
         >
           <span class="total">{{ price.total }}</span>
-          <span v-if="price.perUsableTB" class="per">{{ price.perUsableTB }} / usable TB</span>
+          <span v-if="price.perUsable" class="per">{{ price.perUsable }} / usable {{ price.unit }}</span>
         </span>
         <span class="scheme-pill">{{ schemeName }}</span>
       </div>

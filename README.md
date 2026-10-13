@@ -18,14 +18,14 @@ Source: <https://github.com/cytrinox/ceph-calc>
   pool layout, recovery reserve and Ceph's default fill ratios.
 - Miscellaneous (step 5, optional): a price per TB of raw drive capacity, empty by default, with a free-text
   currency that starts as the browser locale's symbol (`€`, `$`, `£`, `CHF`, …); once a price is set, the Real net
-  capacity card shows the cluster's drive cost and the cost per usable TB. The PG target per OSD
-  (`mon_target_pg_per_osd`, default 100 like Ceph) drives the pg_num recommendation and is set on the cluster when
-  changed. "Create virtual CRUSH map" adds a panel below the layout comparison with the output `ceph osd crush tree`
-  would print for the hardware: every `×N` copy and OSD as its own item with Ceph-style IDs, names and weights
-  (TiB), optionally with the shadow trees per device class (`--show-shadow`), and a button that copies the whole
-  tree. Large trees show their first 500 rows each. A CRUSH bucket weighs at most 65,536 TiB (32-bit fixed point);
-  when the hardware exceeds that with Ceph's default weights (TiB), a warning appears and the recommendations
-  suggest `osd_crush_initial_weight = 1`.
+  capacity card shows the cluster's drive cost and the cost per usable TB (or TiB, following the unit toggle). The
+  PG target per OSD (`mon_target_pg_per_osd`, default 100 like Ceph) drives the pg_num recommendation and is set on
+  the cluster when changed. "Create virtual CRUSH map" adds a panel below the layout comparison with the output
+  `ceph osd crush tree` would print for the hardware: every `×N` copy and OSD as its own item with Ceph-style IDs,
+  names and weights (TiB), optionally with the shadow trees per device class (`--show-shadow`), and a button that
+  copies the whole tree. Large trees show their first 500 rows each. A CRUSH bucket weighs at most 65,536 TiB
+  (32-bit fixed point); when the hardware exceeds that with Ceph's default weights (TiB), a warning appears and the
+  recommendations suggest `osd_crush_initial_weight = 1`.
 - Pool schemes: replication (`size`, `min_size`) or erasure coding (`k`, `m`, and `min_size`, which defaults to
   Ceph's `k + min(1, m − 1)`), with common presets.
 - Headroom: recovery reserve (free space to recover the data of N failed failure domains, capped at the

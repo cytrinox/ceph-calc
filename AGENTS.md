@@ -41,7 +41,7 @@ src/
     schemes.ts            presets (Replication 2x–4x, EC …) and scheme labels
     urlState.ts           AppState <-> compact JSON in the URL hash (#s=…), defaults, untrusted-input checks
     format.ts / units.ts  number formatting; TB/TiB display unit (formatCapacity)
-    pricing.ts            price per TB, cost per usable TB, formatPrice, CURRENCY_MAX_LENGTH
+    pricing.ts            price per TB, cost per usable TB/TiB, formatPrice, CURRENCY_MAX_LENGTH
     recommendations.ts    recommendations from the result (nearfull ratio for the recovery reserve), applied as overrides
     iops.ts               IOPS estimate: OSD ops per client op (opCosts), capacity-weighted OSD count, ceiling
     crushTree.ts          virtual `ceph osd crush tree` output of the topology (step 5 "Create virtual CRUSH map")
@@ -212,7 +212,8 @@ IOPS    = min over the pool's classes c of N_eff,c / (reads / R_c + writes / W_c
   and keep components thin.
 - **Style:** match the surrounding code. Comments are short and explain *why*; there are no linters, so follow the
   existing formatting (2 spaces, no semicolons, single quotes, about 120 columns).
-- **Formatting numbers:** use `formatCapacity()` for every displayed capacity (it follows the TB/TiB toggle),
+- **Formatting numbers:** use `formatCapacity()` for every displayed capacity (it follows the TB/TiB toggle; values
+  per capacity, like the cost per usable TB/TiB, convert with `unitPerTB()` and name `capacityUnit`),
   `formatInt` / `formatPct` / `formatPrice` for the rest, and `plural(type, n)` for bucket names. Don't format by
   hand.
 - **Numeric inputs:** these are text inputs with `inputmode`, never `type="number"` (`NumberField`, `MiniStepper`).

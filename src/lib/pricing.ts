@@ -41,9 +41,12 @@ export function clusterPrice(rawTB: number, pricePerTB: number): number {
   return Math.max(0, rawTB) * Math.max(0, pricePerTB)
 }
 
-/** Effective cost per usable TB (null when nothing is usable). */
-export function pricePerUsableTB(totalPrice: number, usableTB: number): number | null {
-  return usableTB > 0 ? totalPrice / usableTB : null
+/**
+ * Effective cost per unit of usable capacity, in the unit `usable` is given in (TB, or TiB for the unit toggle);
+ * null when nothing is usable.
+ */
+export function pricePerUsable(totalPrice: number, usable: number): number | null {
+  return usable > 0 ? totalPrice / usable : null
 }
 
 /**
