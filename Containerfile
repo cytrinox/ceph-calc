@@ -21,7 +21,7 @@ FROM docker.io/nginxinc/nginx-unprivileged:stable-alpine
 
 LABEL org.opencontainers.image.title="ceph-calc" \
       org.opencontainers.image.description="Interactive capacity calculator for your future ceph cluster" \
-      org.opencontainers.image.licenses="GPL-3.0-only" \
+      org.opencontainers.image.licenses="AGPL-3.0-only" \
       org.opencontainers.image.source="https://github.com/cytrinox/ceph-calc"
 
 COPY nginx.conf /etc/nginx/conf.d/default.conf

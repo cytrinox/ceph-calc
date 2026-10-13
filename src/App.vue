@@ -418,7 +418,7 @@ watch(
         <AppIcon name="scale" :size="14" />
         <span>
           Free software, licensed under the
-          <a href="https://www.gnu.org/licenses/gpl-3.0.html" target="_blank" rel="noopener noreferrer">GNU GPL v3.0</a>
+          <a href="https://www.gnu.org/licenses/agpl-3.0.html" target="_blank" rel="noopener noreferrer">GNU AGPL v3.0</a>
           ·
           <a href="https://github.com/cytrinox/ceph-calc" target="_blank" rel="noopener noreferrer">Source on GitHub</a>
         </span>

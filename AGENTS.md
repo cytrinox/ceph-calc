@@ -9,7 +9,7 @@ the conventions to follow, and the deliberate decisions that are easy to undo by
 - **Beta, not published yet.** There are no public links, users or stored state to stay compatible with, so
   **don't add migration or backward-compatibility code** for URL state or `localStorage`. Renaming or rescaling a
   field is fine. Revisit this once the site is live.
-- **License:** GPL-3.0-only.
+- **License:** AGPL-3.0-only.
 - **Package manager:** npm (`package-lock.json`). Yarn Plug'n'Play files are ignored on purpose.
 
 ## Commands
