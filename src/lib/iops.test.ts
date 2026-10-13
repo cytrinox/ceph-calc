@@ -15,18 +15,41 @@ const one = (osd: OsdIops, placedTB: number, largestOsdTB: number, ioSizeKiB?: n
 
 describe('opCosts', () => {
   it('counts OSD operations per client read and write', () => {
-    expect(opCosts(rep3, classic)).toEqual({ read: { reads: 1, writes: 0 }, write: { reads: 0, writes: 3 } })
+    expect(opCosts(rep3, classic)).toEqual({ read: { reads: 1, writes: 0 }, write: { reads: 0, writes: 3 }, objects: 1 })
     // classic EC: whole-stripe reads and read-modify-write
-    expect(opCosts(ec(4, 2), classic)).toEqual({ read: { reads: 4, writes: 0 }, write: { reads: 4, writes: 6 } })
+    expect(opCosts(ec(4, 2), classic)).toMatchObject({ read: { reads: 4, writes: 0 }, write: { reads: 4, writes: 6 } })
     expect(opCosts(ec(4, 2), { ...classic, fastRead: true }).read).toEqual({ reads: 6, writes: 0 })
   })
 
   it('uses partial reads and the cheaper small-write method with EC optimizations', () => {
     // Ceph FastEC blog: 6+2 small write = parity delta 3 reads + 3 writes (partial write would read 5)
-    expect(opCosts(ec(6, 2), optimized)).toEqual({ read: { reads: 1, writes: 0 }, write: { reads: 3, writes: 3 } })
+    expect(opCosts(ec(6, 2), optimized)).toMatchObject({ read: { reads: 1, writes: 0 }, write: { reads: 3, writes: 3 } })
     // 2+2: a partial write reads the one other data shard
     expect(opCosts(ec(2, 2), optimized).write).toEqual({ reads: 1, writes: 3 })
     expect(opCosts(ec(4, 2), optimized).write).toEqual({ reads: 3, writes: 3 })
+  })
+})
+
+describe('requests larger than an object', () => {
+  const su4 = { ...classic, stripeUnitKiB: 4 }
+
+  it('takes one RADOS operation per object a request covers', () => {
+    // 8M on 4M objects: two operations, each with the costs of a 4M request
+    expect(opCosts(rep3, classic, 8192, 4096)).toEqual({ read: { reads: 2, writes: 0 }, write: { reads: 0, writes: 6 }, objects: 2 })
+    expect(opCosts(ec(4, 2), su4, 8192, 4096)).toMatchObject({ read: { reads: 8, writes: 0 }, write: { reads: 0, writes: 12 }, objects: 2 })
+    expect(opCosts(ec(4, 2), { ...su4, ecOptimizations: true }, 8192, 4096).read).toEqual({ reads: 8, writes: 0 })
+    // up to the object size a request stays in one object; smaller objects split earlier
+    expect(opCosts(rep3, classic, 4096, 4096).objects).toBe(1)
+    expect(opCosts(rep3, classic, 1024, 256).objects).toBe(4)
+  })
+
+  it('halves the IOPS ceiling from one object to two', () => {
+    const at = (size: number) =>
+      estimateIops(iopsBasis([{ cls: 'ssd', osd: { read: 1000, write: 1000 }, largestOsdTB: 8 }], 320, size)!, ec(4, 2), su4)
+    expect(at(4096).read).toBe(10_000) // 40 OSDs × 1000 ÷ 4
+    expect(at(8192).read).toBe(5_000) // ÷ 8
+    const small = iopsBasis([{ cls: 'ssd', osd: { read: 1000, write: 1000 }, largestOsdTB: 8 }], 320, 1024, true, 256)!
+    expect(estimateIops(small, ec(4, 2), su4).read).toBe(2_500) // 1M on 256K objects: 4 × 4 reads
   })
 })
 

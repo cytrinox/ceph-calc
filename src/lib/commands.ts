@@ -9,6 +9,7 @@ import {
   usesPgNum,
   type PoolOptions,
 } from './pool'
+import { DEFAULT_OBJECT_SIZE_KIB, ioSizeLabel } from './iops'
 import type { ConfigSetting, RatioKey } from './recommendations'
 import type { DomainType } from './topology'
 
@@ -16,6 +17,8 @@ export interface CommandLine {
   /** Command split into parts; parts after the first are rendered as continuation lines. */
   parts: string[]
   note?: string
+  /** An example to adapt: rendered commented out, so running the script skips it. */
+  example?: boolean
 }
 
 export interface CommandSection {
@@ -38,6 +41,8 @@ export interface CommandInput {
   ratioOverrides?: Partial<Record<RatioKey, number>>
   /** `ceph config set global` options from applied recommendations. */
   configSettings?: ConfigSetting[]
+  /** RADOS object size (step 5), in KiB; the examples set it when it isn't Ceph's default 4M. */
+  objectSizeKiB?: number
 }
 
 /** Starting pg_num when the autoscaler manages the pool (Ceph's osd_pool_default_pg_num). */
@@ -231,12 +236,64 @@ export function buildCommands(input: CommandInput): CommandSection[] {
     sections.push({ id: 'application', title: 'Application', note: notes[pool.application], lines: app })
   }
 
+  const examples = usageExamples(pool, name, isEc, input.objectSizeKiB ?? DEFAULT_OBJECT_SIZE_KIB)
+  if (examples.length) {
+    sections.push({
+      id: 'examples',
+      title: 'Examples',
+      note: 'Commented out: adjust the names, sizes and paths, then run them.',
+      lines: examples,
+    })
+  }
+
   const flags: CommandLine[] = []
   if (pool.noSizeChange) flags.push(set('nosizechange', true))
   if (pool.noDelete) flags.push(set('nodelete', true))
   if (flags.length) sections.push({ id: 'flags', title: 'Protection flags', lines: flags })
 
   return sections
+}
+
+/**
+ * Commented-out examples for using the pool: an RBD image or a CephFS file system. The object size is the client's
+ * choice, not the pool's: with anything but Ceph's default 4M the examples set it (RBD per image, CephFS per
+ * directory layout, whose stripe_unit must fit into the object size).
+ */
+function usageExamples(pool: PoolOptions, name: string, isEc: boolean, objectSizeKiB: number): CommandLine[] {
+  const custom = objectSizeKiB !== DEFAULT_OBJECT_SIZE_KIB
+  const example = (text: string, note?: string): CommandLine => ({ parts: [text], note, example: true })
+  if (pool.application === 'rbd') {
+    const size = custom ? ` --object-size ${ioSizeLabel(objectSizeKiB)}` : ''
+    // EC pools hold only the data; the image itself lives in a replicated pool.
+    return [
+      isEc
+        ? example(
+            `rbd create --size 100G${size} --data-pool ${name} rbd/image01`,
+            'rbd: a replicated pool (rbd pool init)',
+          )
+        : example(`rbd create --size 100G${size} ${name}/image01`),
+    ]
+  }
+  if (pool.application === 'cephfs') {
+    const dir = '/mnt/cephfs/<dir>'
+    const lines = isEc
+      ? [
+          example(`ceph fs add_data_pool cephfs ${name}`, 'an EC pool is an additional data pool, not the default one'),
+          example(`setfattr -n ceph.dir.layout.pool -v ${name} ${dir}`, "new files in <dir> go to this pool"),
+        ]
+      : [example(`ceph fs new cephfs cephfs_metadata ${name}`, 'cephfs_metadata: a replicated metadata pool')]
+    if (custom) {
+      const bytes = objectSizeKiB * 1024
+      // The default stripe_unit (4M) must fit into the object size: shrink it first.
+      if (objectSizeKiB < DEFAULT_OBJECT_SIZE_KIB) {
+        lines.push(example(`setfattr -n ceph.dir.layout.stripe_unit -v ${bytes} ${dir}`))
+      }
+      const note = `${ioSizeLabel(objectSizeKiB)} objects for new files`
+      lines.push(example(`setfattr -n ceph.dir.layout.object_size -v ${bytes} ${dir}`, note))
+    }
+    return lines
+  }
+  return []
 }
 
 /** Plain-text script: section titles and notes as comments, continuation lines with backslashes. */
@@ -248,7 +305,8 @@ export function commandsToScript(sections: CommandSection[], shebang = false): s
     if (s.note) out.push(`# ${s.note}`)
     for (const line of s.lines) {
       const text = line.parts.join(' \\\n    ')
-      out.push(line.note ? `${text}  # ${line.note}` : text)
+      const full = line.note ? `${text}  # ${line.note}` : text
+      out.push(line.example ? full.split('\n').map((l) => `# ${l}`).join('\n') : full)
     }
   })
   return out.join('\n') + '\n'

@@ -19,6 +19,8 @@ const props = defineProps<{
   recommendations: Recommendation[]
   /** mon_target_pg_per_osd (step 5); set on the cluster when it differs from Ceph's default. */
   pgTargetPerOsd: number
+  /** RADOS object size (step 5); the RBD / CephFS examples set it when it isn't 4M. */
+  objectSizeKiB: number
 }>()
 
 const includeClusterSettings = ref(true)
@@ -44,6 +46,7 @@ const sections = computed(() =>
     tunables: props.tunables,
     includeClusterSettings: includeClusterSettings.value,
     pgTargetPerOsd: props.pgTargetPerOsd,
+    objectSizeKiB: props.objectSizeKiB,
     ratioOverrides: Object.assign({}, ...applied.value.map((r) => r.ratios ?? {})),
     configSettings: applied.value.flatMap((r) => r.config ?? []),
   }),
@@ -152,8 +155,8 @@ function download() {
         </button>
         <pre><code><span class="comment"># {{ si + 1 }}. {{ section.title }}</span>
 <template v-if="section.note"><span class="comment"># {{ section.note }}</span>
-</template><template v-for="(line, li) in section.lines" :key="li"><template v-for="(part, pi) in line.parts" :key="pi"><template v-if="pi > 0"> \
-    </template><span v-for="(tok, ti) in tokenize(part, pi === 0)" :key="ti" :class="tok.kind">{{ tok.text }}</span></template><span v-if="line.note" class="comment">  # {{ line.note }}</span>
+</template><template v-for="(line, li) in section.lines" :key="li"><span v-if="line.example" class="comment"># {{ line.parts.join(' ') }}<template v-if="line.note">  # {{ line.note }}</template></span><template v-else><template v-for="(part, pi) in line.parts" :key="pi"><template v-if="pi > 0"> \
+    </template><span v-for="(tok, ti) in tokenize(part, pi === 0)" :key="ti" :class="tok.kind">{{ tok.text }}</span></template><span v-if="line.note" class="comment">  # {{ line.note }}</span></template>
 </template></code></pre>
       </div>
     </div>

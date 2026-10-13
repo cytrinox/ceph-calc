@@ -132,14 +132,15 @@ const iops = computed(() => {
   const placedTB = poolStats.value.rawTB - domains.value.unplacedTB
   if (state.tab === 'basic') {
     const osd = iopsOf(BASIC_IOPS)
-    return iopsBasis([{ cls: BASIC_IOPS, osd, largestOsdTB: poolStats.value.largestOsdTB }], placedTB, state.ioSizeKiB)
+    const basic = [{ cls: BASIC_IOPS, osd, largestOsdTB: poolStats.value.largestOsdTB }]
+    return iopsBasis(basic, placedTB, state.ioSizeKiB, hasIops(osd), state.objectSizeKiB)
   }
   const usage = deviceClassUsage(poolTopology.value)
   const classes = sortDeviceClasses(Object.keys(usage))
     .filter((cls) => usage[cls].osds > 0)
     .map((cls) => ({ cls, osd: iopsOf(cls), largestOsdTB: usage[cls].largestTB }))
   const entered = iopsClasses.value.some((cls) => hasIops(iopsOf(cls)))
-  return iopsBasis(classes, placedTB, state.ioSizeKiB, entered)
+  return iopsBasis(classes, placedTB, state.ioSizeKiB, entered, state.objectSizeKiB)
 })
 const iopsEstimate = computed(() => (iops.value ? estimateIops(iops.value, state.scheme, state.pool) : null))
 
@@ -257,6 +258,7 @@ const recommendationList = computed(() =>
     crushOverflow: crushOverflow.value,
     pool: state.pool,
     ioSizeKiB: state.ioSizeKiB,
+    objectSizeKiB: state.objectSizeKiB,
     iops: iops.value,
     osdCount: poolStats.value.counts.osd,
     pgTargetPerOsd: state.pgTargetPerOsd,
@@ -388,6 +390,7 @@ watch(
           :placement-problem="placementProblem"
           :recommendations="recommendationList"
           :pg-target-per-osd="state.pgTargetPerOsd"
+          :objectSizeKiB="state.objectSizeKiB"
         />
         <FaqPanel />
       </div>

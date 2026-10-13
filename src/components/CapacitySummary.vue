@@ -32,7 +32,9 @@ const iopsValue = (n: number | null) => (props.result.valid && n !== null ? form
 const iopsNote = (estimate: IopsEstimate, op: 'read' | 'write') => {
   const cost = estimate.costs[op]
   const { missing } = estimate.ops[op]
-  if (missing.length === 0) return `${describeCost(cost)} per client ${op}`
+  // A request larger than an object takes one operation per object (step 5).
+  const objects = estimate.costs.objects > 1 ? ` (${estimate.costs.objects} objects)` : ''
+  if (missing.length === 0) return `${describeCost(cost)} per client ${op}${objects}`
   const kinds = [cost.reads > 0 && 'read', cost.writes > 0 && 'write'].filter(Boolean).join(' and ')
   // The Basic tab's values have no class.
   const classes = missing.filter((cls) => cls !== BASIC_IOPS)

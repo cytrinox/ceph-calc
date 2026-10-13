@@ -187,3 +187,49 @@ describe('placement groups', () => {
   })
 })
 
+describe('usage examples', () => {
+  const rep3: Scheme = { kind: 'replicated', size: 3, minSize: 2 }
+  const ec42: Scheme = { kind: 'ec', k: 4, m: 2 }
+  const examples = (scheme: Scheme, application: 'rbd' | 'cephfs' | 'rgw', objectSizeKiB?: number) => {
+    const sections = buildCommands(input(scheme, { ...defaultPoolOptions(), application }, { objectSizeKiB }))
+    return sections.find((x) => x.id === 'examples')
+  }
+  const lines = (section: ReturnType<typeof examples>) => section!.lines.map((l) => l.parts.join(' '))
+
+  it('creates an RBD image, with the object size only when it is not the default', () => {
+    expect(lines(examples(rep3, 'rbd'))).toEqual(['rbd create --size 100G data/image01'])
+    expect(lines(examples(rep3, 'rbd', 1024))).toEqual(['rbd create --size 100G --object-size 1M data/image01'])
+    // EC: the data pool next to a replicated image pool
+    expect(lines(examples(ec42, 'rbd', 4096))).toEqual(['rbd create --size 100G --data-pool data rbd/image01'])
+    expect(examples(rep3, 'rbd')!.lines.every((l) => l.example)).toBe(true)
+  })
+
+  it('creates a CephFS file system and sets the object size in a directory layout', () => {
+    expect(lines(examples(rep3, 'cephfs'))).toEqual(['ceph fs new cephfs cephfs_metadata data'])
+    // smaller than the default stripe_unit (4M): shrink it first
+    expect(lines(examples(rep3, 'cephfs', 1024))).toEqual([
+      'ceph fs new cephfs cephfs_metadata data',
+      'setfattr -n ceph.dir.layout.stripe_unit -v 1048576 /mnt/cephfs/<dir>',
+      'setfattr -n ceph.dir.layout.object_size -v 1048576 /mnt/cephfs/<dir>',
+    ])
+    // larger: the 4M stripe_unit still fits
+    expect(lines(examples(rep3, 'cephfs', 8192)).slice(1)).toEqual([
+      'setfattr -n ceph.dir.layout.object_size -v 8388608 /mnt/cephfs/<dir>',
+    ])
+    // EC: an additional data pool for a directory, not the default one
+    expect(lines(examples(ec42, 'cephfs'))).toEqual([
+      'ceph fs add_data_pool cephfs data',
+      'setfattr -n ceph.dir.layout.pool -v data /mnt/cephfs/<dir>',
+    ])
+  })
+
+  it('has no examples for other applications', () => {
+    expect(examples(rep3, 'rgw')).toBeUndefined()
+  })
+
+  it('comments the examples out in the script', () => {
+    const s = script(input(rep3, { ...defaultPoolOptions(), application: 'rbd' }, { objectSizeKiB: 1024 }))
+    expect(s).toContain('# Examples\n# Commented out: adjust the names, sizes and paths, then run them.\n# rbd create --size 100G --object-size 1M data/image01\n')
+  })
+})
+

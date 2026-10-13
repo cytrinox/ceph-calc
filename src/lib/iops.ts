@@ -8,9 +8,14 @@ import type { PoolOptions } from './pool'
 /** Upper bound for the per-OSD inputs (also used for shared links). */
 export const MAX_OSD_IOPS = 10_000_000
 
-/** Client I/O sizes the estimate supports, in KiB. */
-export const IO_SIZES_KIB = [4, 8, 16, 32, 64, 128, 256, 512, 1024] as const
+/** Client I/O sizes the estimate supports, in KiB (4K–8M). */
+export const IO_SIZES_KIB = [4, 8, 16, 32, 64, 128, 256, 512, 1024, 2048, 4096, 8192] as const
 export const DEFAULT_IO_SIZE_KIB = 4
+
+/** RADOS object sizes, in KiB (RBD image object size, CephFS layout object_size, RGW stripe size). */
+export const OBJECT_SIZES_KIB = [64, 128, 256, 512, 1024, 2048, 4096, 8192, 16384, 32768] as const
+/** 4M: Ceph's default object size for RBD images and CephFS files (and RGW's stripe size). */
+export const DEFAULT_OBJECT_SIZE_KIB = 4096
 
 /** "4K", "64K", "1M". */
 export function ioSizeLabel(kib: number): string {
@@ -32,12 +37,33 @@ export interface OpCost {
 export interface OpCosts {
   read: OpCost
   write: OpCost
+  /** RADOS objects one client request touches: one operation each. */
+  objects: number
 }
 
 export type IopsPoolOptions = Pick<PoolOptions, 'fastRead' | 'ecOptimizations' | 'stripeUnitKiB'>
 
 /**
- * OSD reads and writes per client read / write of `ioSizeKiB` (requests aligned to their size;
+ * OSD reads and writes per client read / write of `ioSizeKiB`. A RADOS operation addresses one object, so a request
+ * larger than `objectSizeKiB` is split into one operation per object; requests are aligned to their size and both
+ * sizes are powers of two, so it covers whole objects (and a smaller one stays inside one).
+ */
+export function opCosts(
+  scheme: Scheme,
+  pool: IopsPoolOptions,
+  ioSizeKiB: number = DEFAULT_IO_SIZE_KIB,
+  objectSizeKiB: number = DEFAULT_OBJECT_SIZE_KIB,
+): OpCosts {
+  const size = Math.max(1, ioSizeKiB)
+  const object = Math.max(1, objectSizeKiB)
+  const objects = size > object ? Math.ceil(size / object) : 1
+  const per = objectOpCosts(scheme, pool, Math.min(size, object))
+  const times = (c: OpCost): OpCost => ({ reads: c.reads * objects, writes: c.writes * objects })
+  return { read: times(per.read), write: times(per.write), objects }
+}
+
+/**
+ * OSD reads and writes per operation of `ioSizeKiB` on one object (requests aligned to their size;
  * strips of one shard are contiguous, so a shard counts once per request):
  * - replication: a read hits the primary only, a write goes to every copy;
  * - classic EC: a read fetches whole stripes (k shards, all k+m with fast_read); a write of part
@@ -47,7 +73,7 @@ export type IopsPoolOptions = Pick<PoolOptions, 'fastRead' | 'ecOptimizations' |
  *   (k-d reads), whichever reads less, and writes the d changed data shards plus m parity shards;
  * - whole stripes are written without reading (k+m writes); a remainder beyond them is partial.
  */
-export function opCosts(scheme: Scheme, pool: IopsPoolOptions, ioSizeKiB: number = DEFAULT_IO_SIZE_KIB): OpCosts {
+function objectOpCosts(scheme: Scheme, pool: IopsPoolOptions, ioSizeKiB: number): Omit<OpCosts, 'objects'> {
   if (scheme.kind === 'replicated') {
     return { read: { reads: 1, writes: 0 }, write: { reads: 0, writes: scheme.size } }
   }
@@ -106,6 +132,8 @@ export interface IopsBasis {
   /** Capacity of the OSDs the pool uses (all its classes). */
   placedTB: number
   ioSizeKiB: number
+  /** RADOS object size: a larger request takes one operation per object. */
+  objectSizeKiB: number
 }
 
 export const hasIops = (osd: OsdIops) => osd.read > 0 || osd.write > 0
@@ -126,12 +154,14 @@ export function iopsBasis(
   placedTB: number,
   ioSizeKiB: number = DEFAULT_IO_SIZE_KIB,
   entered: boolean = classes.some((c) => hasIops(c.osd)),
+  objectSizeKiB: number = DEFAULT_OBJECT_SIZE_KIB,
 ): IopsBasis | null {
   if (!entered || classes.length === 0) return null
   return {
     classes: classes.map((c) => ({ ...c, equivalents: osdEquivalents(placedTB, c.largestOsdTB) })),
     placedTB,
     ioSizeKiB,
+    objectSizeKiB,
   }
 }
 
@@ -176,7 +206,7 @@ function estimateOp(basis: IopsBasis, cost: OpCost): OpEstimate {
 }
 
 export function estimateIops(basis: IopsBasis, scheme: Scheme, pool: IopsPoolOptions): IopsEstimate {
-  const costs = opCosts(scheme, pool, basis.ioSizeKiB)
+  const costs = opCosts(scheme, pool, basis.ioSizeKiB, basis.objectSizeKiB)
   const read = estimateOp(basis, costs.read)
   const write = estimateOp(basis, costs.write)
   return { read: read.value, write: write.value, costs, basis, ops: { read, write } }

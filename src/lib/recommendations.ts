@@ -45,6 +45,8 @@ export interface RecommendationInput {
   pool?: PoolOptions
   /** Client I/O size of the IOPS estimate (step 5), in KiB. */
   ioSizeKiB?: number
+  /** RADOS object size (step 5), in KiB. */
+  objectSizeKiB?: number
   /** IOPS basis when per-OSD IOPS are set, to show what a change does to the estimate. */
   iops?: IopsBasis | null
   /** OSDs the CRUSH rule uses (its device class only). */
@@ -424,8 +426,14 @@ export function crushWeightRecommendation({ crushOverflow }: RecommendationInput
  * OSD operations per client read and write of `size` ("16K: read 1 OSD read, write 3 reads + 3 writes"), plus the
  * IOPS they allow when per-OSD IOPS are set for that size (the client I/O size of step 5).
  */
-function ecEffect(scheme: Scheme, options: PoolOptions, size: number, iops: IopsBasis | null | undefined): string {
-  const costs = opCosts(scheme, options, size)
+function ecEffect(
+  scheme: Scheme,
+  options: PoolOptions,
+  size: number,
+  iops: IopsBasis | null | undefined,
+  objectSizeKiB: number | undefined,
+): string {
+  const costs = opCosts(scheme, options, size, objectSizeKiB)
   const ops = `${ioSizeLabel(size)}: read ${describeCost(costs.read)}, write ${describeCost(costs.write)}`
   const estimate = iops && iops.ioSizeKiB === size ? estimateIops(iops, scheme, options) : null
   return estimate && estimate.read !== null && estimate.write !== null
@@ -444,6 +452,7 @@ export function ecOptimizationsRecommendation({
   scheme,
   pool,
   ioSizeKiB,
+  objectSizeKiB,
   iops,
 }: RecommendationInput): Recommendation | null {
   if (scheme.kind !== 'ec' || !pool || pool.ecOptimizations) return null
@@ -457,9 +466,9 @@ export function ecOptimizationsRecommendation({
     {
       parameter: 'allow_ec_optimizations (step 4)',
       from: 'false',
-      fromNote: ecEffect(scheme, pool, size, iops),
+      fromNote: ecEffect(scheme, pool, size, iops, objectSizeKiB),
       to: 'true',
-      toNote: ecEffect(scheme, optimized, size, iops),
+      toNote: ecEffect(scheme, optimized, size, iops, objectSizeKiB),
     },
   ]
   if (raiseStripeUnit) {
@@ -515,6 +524,7 @@ export function stripeUnitRecommendation({
   scheme,
   pool,
   ioSizeKiB,
+  objectSizeKiB,
   iops,
 }: RecommendationInput): Recommendation | null {
   if (scheme.kind !== 'ec' || !pool?.ecOptimizations || pool.stripeUnitKiB >= EC_OPTIMIZED_STRIPE_UNIT_KIB) return null
@@ -534,9 +544,9 @@ export function stripeUnitRecommendation({
       {
         parameter: 'stripe_unit (step 4)',
         from: ioSizeLabel(pool.stripeUnitKiB),
-        fromNote: ecEffect(scheme, pool, size, iops),
+        fromNote: ecEffect(scheme, pool, size, iops, objectSizeKiB),
         to: ioSizeLabel(to),
-        toNote: ecEffect(scheme, raised, size, iops),
+        toNote: ecEffect(scheme, raised, size, iops, objectSizeKiB),
       },
     ],
     details: [

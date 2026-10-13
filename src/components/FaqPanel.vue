@@ -238,6 +238,13 @@ import { FAQ_IDS } from '@/lib/faq'
             k × <code>stripe_unit</code>) is written without reading. That is why Ceph recommends a
             <code>stripe_unit</code> of at least 16K with EC optimizations: medium-sized requests touch fewer shards.
           </p>
+          <p>
+            Each shard counts once per request: all stripes of an object live on the same k+m OSDs, and every OSD
+            stores its shard of all stripes back to back, so the strips a request needs from one OSD form one
+            contiguous read. Only a request larger than a RADOS object (the object size in step 5, 4M by default for
+            RBD and CephFS) is split: the client sends one operation per object, each with the costs above. An 8M read
+            on 4M objects therefore costs twice the OSD operations of a 4M read.
+          </p>
 
           <p class="example-title">How the calculator computes it</p>
           <pre class="formula">N_eff = capacity of all OSDs ÷ capacity of the largest OSD
@@ -296,8 +303,9 @@ N_eff,c = capacity of all OSDs ÷ capacity of the largest OSD of class c</pre>
               <code>ceph tell osd.N bench</code> for writes), so BlueStore overhead is included;
             </li>
             <li>
-              requests are aligned to their size; strips of one shard that a request touches count as one operation,
-              and shard operations smaller than the request count as full operations (slightly conservative).
+              requests are aligned to their size, so up to the object size they stay inside one object; strips of
+              one shard that a request touches count as one operation, and shard operations smaller than the request
+              count as full operations (slightly conservative).
             </li>
           </ul>
 

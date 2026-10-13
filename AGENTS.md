@@ -159,6 +159,9 @@ IOPS    = min over the pool's classes c of N_eff,c / (reads / R_c + writes / W_c
   their largest OSD (`deviceClassUsage().largestTB`); the lowest class ceiling wins (`estimateOp`), and the tooltip
   names that class.
 
+- **Objects:** a RADOS operation addresses one object, so a request larger than the object size (step 5,
+  `objectSizeKiB`, default 4M; link `io[2]` when not 4M) costs one per-object request per object (`opCosts`
+  multiplies; `costs.objects`). Aligned power-of-two sizes never straddle objects. Client sizes go up to 8M.
 - **OSD operations per client op** (`opCosts`; d = min(k, ⌈I/O size / stripe_unit⌉), requests aligned to their size):
   - replication: 1 read / n writes;
   - classic EC: k reads (k+m with `fast_read`) / k reads + k+m writes;
@@ -272,6 +275,10 @@ IOPS    = min over the pool's classes c of N_eff,c / (reads / R_c + writes / W_c
 - **Cluster-wide settings** (switch "Include cluster-wide settings", `includeClusterSettings`): the fill ratios and,
   when it isn't 100, `mon_target_pg_per_osd`. Applied recommendation ratios are emitted even with the switch off.
 - **No empty sections:** push a section only when it has lines (e.g. "EC options", "Autoscaler hints").
+- **Examples** (`usageExamples`): commented-out lines (`CommandLine.example`, rendered and scripted as `# …`) for
+  RBD (`rbd create`, `--data-pool` for EC) and CephFS (`ceph fs new`, or `add_data_pool` plus a directory layout for
+  EC). The object size is a client setting, not a pool one: with anything but 4M they add `--object-size` (RBD) or
+  `setfattr ceph.dir.layout.*` (CephFS, `stripe_unit` first when the object size is smaller than 4M).
 - **Default names:**
   - CRUSH rules: `rep3_host`, `ec4-2_rack_nvme` (k and m separated, so EC 2+11 and EC 21+1 don't collide);
   - EC profiles: `ec-4-2-rack-nvme`.

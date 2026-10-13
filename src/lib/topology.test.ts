@@ -219,6 +219,11 @@ describe('topology', () => {
     expect(packed(state).io).toEqual([64, { '': [300, 100] }])
     expect(decodeState(encodeState(state))!.osdIops).toEqual({ '': { read: 300, write: 100 } })
     state.osdIops = { ssd: { read: 5000, write: 99_000_000 }, 'fast-nvme': { read: 0, write: 800 } }
+    // a non-default object size travels as a third element
+    state.objectSizeKiB = 1024
+    expect(packed(state).io[2]).toBe(1024)
+    expect(decodeState(encodeState(state))!.objectSizeKiB).toBe(1024)
+    state.objectSizeKiB = 4096
     // invalid class names from a link are dropped
     const p = packed(state)
     p.io[1]['bad name'] = [1, 1]

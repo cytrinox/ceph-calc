@@ -39,10 +39,11 @@ Source: <https://github.com/cytrinox/ceph-calc>
   `target_size_bytes`, compression (with an expected compression ratio, default 0.90, shown as an effective-capacity
   badge), quotas, and the `nodelete` / `nosizechange` flags. Leave the rule or profile name empty to get a derived
   name such as `rep3_host` or `ec-4-2-rack-nvme`.
-- IOPS (also step 5, optional): a client I/O size (4K–1M) and, on the Advanced tab in one tab per device class of
-  the tree (custom classes included; the Basic tab has one set without tabs), the random read and write IOPS of one
-  OSD at that size give an estimated cluster ceiling for the selected layout (result card, with the arithmetic in
-  the tooltip) and for every preset (comparison table).
+- IOPS (also step 5, optional): a client I/O size (4K–8M), the RADOS object size (default 4M; a larger request takes
+  one operation per object) and, on the Advanced tab in one tab per device class of the tree (custom classes
+  included; the Basic tab has one set without tabs), the random read and write IOPS of one OSD at that size give an
+  estimated cluster ceiling for the selected layout (result card, with the arithmetic in the tooltip) and for every
+  preset (comparison table).
 - Raw data distribution bar: usable data, protection overhead, reserved headroom (kept free on purpose) and,
   when there is any, unusable space (yellow; can never be filled), with markers where a healthy cluster
   reaches the nearfull, backfillfull and full ratios. Below the usable share, `+X until backfillfull` /
@@ -62,10 +63,12 @@ Source: <https://github.com/cytrinox/ceph-calc>
   operations and IOPS, Ceph Tentacle or later; a 16K stripe_unit once they are on; the pg_num the autoscaler would
   aim for when the pool sets its own) have an "Adopt recommendation" button: it changes the inputs, and the
   recommendation is replaced by a short "Adopted" note that fades out.
-- Ceph commands panel: the full command sequence for the configuration (fill ratios, EC profile, CRUSH rule,
-  pool create, size/min_size (replicated), EC options, autoscaler hints, compression, quotas, application,
-  protection flags), with copy-all, per-section copy and download as a shell script. EC pools only get a
-  `min_size` command when it differs from the default Ceph sets on creation.
+- Ceph commands panel: the full command sequence for the configuration (fill ratios, EC profile, CRUSH rule, pool
+  create, size/min_size (replicated), EC options, autoscaler hints, compression, quotas, application, protection
+  flags), with copy-all, per-section copy and download as a shell script. EC pools only get a `min_size` command
+  when it differs from the default Ceph sets on creation. Commented-out examples show how to use the pool: an RBD
+  image (`rbd create`, with `--data-pool` for EC) or a CephFS file system (`ceph fs new`, or `add_data_pool` plus a
+  directory layout for EC), with the object size from step 5 when it isn't the default 4M.
 - Light/dark theme, responsive single-column layout on phones, and configuration stored in the URL hash;
   the **Share** button copies that link (or opens the native share sheet on phones). The reset button in the Cluster setup
   panel brings every setting back to its default (after asking; theme, unit and open steps stay).

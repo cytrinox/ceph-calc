@@ -14,7 +14,15 @@ import ToggleField from './ToggleField.vue'
 import { DEFAULT_RATIOS, defaultEcMinSize, linkRatios, ratiosOrdered, schemeMinSize, type FillRatios } from '@/lib/ceph'
 import { CUSTOM_EC, CUSTOM_REPLICATED, DEFAULT_PRESET_ID, PRESETS, schemeLabel, schemeSelection } from '@/lib/schemes'
 import { formatInt, formatIops } from '@/lib/format'
-import { BASIC_IOPS, IO_SIZES_KIB, MAX_OSD_IOPS, ioSizeLabel, type OsdIops } from '@/lib/iops'
+import {
+  BASIC_IOPS,
+  DEFAULT_OBJECT_SIZE_KIB,
+  IO_SIZES_KIB,
+  MAX_OSD_IOPS,
+  OBJECT_SIZES_KIB,
+  ioSizeLabel,
+  type OsdIops,
+} from '@/lib/iops'
 import { CURRENCY_MAX_LENGTH, formatPrice } from '@/lib/pricing'
 import { DEFAULT_PG_TARGET_PER_OSD, MAX_PG_TARGET_PER_OSD } from '@/lib/pool'
 import { DEFAULT_OSD_CLASS, TYPE_ID, plural, type DomainType, type TopologyExample } from '@/lib/topology'
@@ -162,7 +170,10 @@ const miscSummary = computed(() => {
     basic
       ? `read ${value(st.osdIops[key].read)} · write ${value(st.osdIops[key].write)}`
       : `${key} ${value(st.osdIops[key].read)} / ${value(st.osdIops[key].write)}`
-  const iops = set.length ? `${ioSizeLabel(st.ioSizeKiB)} · ${set.map(values).join(' · ')} IOPS per OSD` : 'no IOPS'
+  const objects = st.objectSizeKiB !== DEFAULT_OBJECT_SIZE_KIB ? ` · ${ioSizeLabel(st.objectSizeKiB)} objects` : ''
+  const iops = set.length
+    ? `${ioSizeLabel(st.ioSizeKiB)} · ${set.map(values).join(' · ')} IOPS per OSD${objects}`
+    : 'no IOPS'
   const pgTarget = st.pgTargetPerOsd !== DEFAULT_PG_TARGET_PER_OSD ? [`PG target ${formatInt(st.pgTargetPerOsd)}`] : []
   return [price, iops, ...pgTarget, ...(st.crushMap ? ['CRUSH map'] : [])].join(' · ')
 })
@@ -457,6 +468,26 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
           <code>ceph tell osd.N bench</code> for writes), so BlueStore overhead is included. Each device class has its
           own values (Advanced tab). Leave them all empty to hide the estimate.
         </p>
+        <!-- A div, not a label: the hint holds the default link (like NumberField's). -->
+        <div class="select-field">
+          <label for="object-size" class="label">Object size</label>
+          <select id="object-size" v-model.number="state.objectSizeKiB">
+            <option v-for="kib in OBJECT_SIZES_KIB" :key="kib" :value="kib">
+              {{ ioSizeLabel(kib) }}{{ kib === DEFAULT_OBJECT_SIZE_KIB ? ' · RBD and CephFS default' : '' }}
+            </option>
+          </select>
+          <span class="hint">
+            RADOS objects the data is cut into; a larger request takes one operation per object (<button
+              v-if="state.objectSizeKiB !== DEFAULT_OBJECT_SIZE_KIB"
+              type="button"
+              class="reset"
+              :title="`Reset Object size to the default ${ioSizeLabel(DEFAULT_OBJECT_SIZE_KIB)}`"
+              @click="state.objectSizeKiB = DEFAULT_OBJECT_SIZE_KIB"
+            >default {{ ioSizeLabel(DEFAULT_OBJECT_SIZE_KIB) }}</button><template v-else
+              >default {{ ioSizeLabel(DEFAULT_OBJECT_SIZE_KIB) }}</template
+            >)
+          </span>
+        </div>
       </div>
 
       <div class="misc-group">
@@ -543,6 +574,23 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
 
   .label {
     font-weight: 500;
+  }
+
+  // "default 4M" link, like NumberField's.
+  .reset {
+    padding: 0;
+    border: 0;
+    background: none;
+    font: inherit;
+    color: var(--accent-text);
+    text-decoration: underline;
+    text-decoration-style: dotted;
+    text-underline-offset: 2px;
+    cursor: pointer;
+
+    &:hover {
+      text-decoration-style: solid;
+    }
   }
 
   .hint {

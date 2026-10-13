@@ -16,7 +16,15 @@ import {
 } from './pool'
 import { customEcMinSize, DEFAULT_RATIOS, defaultEcMinSize, type Scheme } from './ceph'
 import { CURRENCY_MAX_LENGTH, DEFAULT_PRICE_PER_TB, localCurrency } from './pricing'
-import { BASIC_IOPS, DEFAULT_IO_SIZE_KIB, IO_SIZES_KIB, MAX_OSD_IOPS, type OsdIops } from './iops'
+import {
+  BASIC_IOPS,
+  DEFAULT_IO_SIZE_KIB,
+  DEFAULT_OBJECT_SIZE_KIB,
+  IO_SIZES_KIB,
+  MAX_OSD_IOPS,
+  OBJECT_SIZES_KIB,
+  type OsdIops,
+} from './iops'
 import {
   ALL_DOMAIN_TYPES,
   BUCKET_TYPES,
@@ -53,6 +61,8 @@ export interface AppState {
   osdIops: Record<string, OsdIops>
   /** Client I/O size of the IOPS estimate, in KiB. */
   ioSizeKiB: number
+  /** RADOS object size of the IOPS estimate, in KiB: larger requests take one operation per object. */
+  objectSizeKiB: number
   /** Show the virtual CRUSH map (`ceph osd crush tree`) of the hardware. */
   crushMap: boolean
   /** mon_target_pg_per_osd: PG replicas per OSD the pg_num suggestion (and the autoscaler) aims for. */
@@ -75,6 +85,7 @@ export function defaultState(): AppState {
     currency: localCurrency(),
     osdIops: {},
     ioSizeKiB: DEFAULT_IO_SIZE_KIB,
+    objectSizeKiB: DEFAULT_OBJECT_SIZE_KIB,
     crushMap: false,
     pgTargetPerOsd: DEFAULT_PG_TARGET_PER_OSD,
   }
@@ -100,8 +111,9 @@ interface Packed {
   /** Price per TB. */
   pt?: number
   cu?: string
-  /** I/O size in KiB and per device class the read and write IOPS per OSD; left out when not set. */
-  io?: [number, Record<string, [number, number]>]
+  /** I/O size in KiB, per device class the read and write IOPS per OSD, and the object size in KiB when not 4M;
+   *  left out while nothing is set. */
+  io?: [number, Record<string, [number, number]>] | [number, Record<string, [number, number]>, number]
   /** 1 = show the virtual CRUSH map; left out when off. */
   cm?: 1
   /** PG target per OSD; left out at Ceph's default. */
@@ -121,8 +133,10 @@ function packIops(state: AppState): Pick<Packed, 'io'> {
   const classes = Object.entries(state.osdIops)
     .filter(([cls, o]) => isIopsKey(cls) && (iops(o.read) > 0 || iops(o.write) > 0))
     .map(([cls, o]): [string, [number, number]] => [cls, [iops(o.read), iops(o.write)]])
-  if (classes.length === 0 && state.ioSizeKiB === DEFAULT_IO_SIZE_KIB) return {}
-  return { io: [ioSize(state.ioSizeKiB), Object.fromEntries(classes)] }
+  const object = objectSize(state.objectSizeKiB)
+  if (classes.length === 0 && state.ioSizeKiB === DEFAULT_IO_SIZE_KIB && object === DEFAULT_OBJECT_SIZE_KIB) return {}
+  const io: [number, Record<string, [number, number]>] = [ioSize(state.ioSizeKiB), Object.fromEntries(classes)]
+  return { io: object === DEFAULT_OBJECT_SIZE_KIB ? io : [...io, object] }
 }
 
 function unpackIops(raw: unknown): Record<string, OsdIops> {
@@ -152,6 +166,8 @@ function ecScheme(k: number, m: number, minSize: unknown): Scheme {
 }
 const ioSize = (value: unknown) =>
   (IO_SIZES_KIB as readonly number[]).includes(value as number) ? (value as number) : DEFAULT_IO_SIZE_KIB
+const objectSize = (value: unknown) =>
+  (OBJECT_SIZES_KIB as readonly number[]).includes(value as number) ? (value as number) : DEFAULT_OBJECT_SIZE_KIB
 
 /** A fill ratio from untrusted input, clamped to 0–1; the fallback when missing or not a number. */
 function ratioOr(value: unknown, fallback: number): number {
@@ -315,6 +331,7 @@ export function decodeState(data: string): AppState | null {
     if (Array.isArray(p.io)) {
       state.ioSizeKiB = ioSize(p.io[0])
       state.osdIops = unpackIops(p.io[1])
+      state.objectSizeKiB = objectSize(p.io[2])
     }
     state.crushMap = p.cm === 1
     if (p.pg !== undefined) state.pgTargetPerOsd = pgTarget(p.pg)
