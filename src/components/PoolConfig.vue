@@ -14,6 +14,7 @@ import {
   defaultRuleName,
   isValidName,
   M2_ONLY_TECHNIQUES,
+  MAX_POOL_PG_NUM,
   poolIssues,
   STRIPE_UNITS_KIB,
   TECHNIQUES_BY_PLUGIN,
@@ -200,7 +201,7 @@ const safetySummary = computed(() => {
           label="Number of PGs"
           :default-value="DEFAULT_POOL_PG_NUM"
           :min="1"
-          :max="32768"
+          :max="MAX_POOL_PG_NUM"
           pow2
         />
         <template v-if="pool.autoscaleMode !== 'off'">

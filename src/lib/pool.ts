@@ -174,7 +174,10 @@ export const MAX_PG_TARGET_PER_OSD = 1000
 export const MAX_PG_PER_OSD = 250
 /** The autoscaler's threshold: it changes pg_num, or warns in warn mode, only when off by more than this factor. */
 export const PG_AUTOSCALE_THRESHOLD = 3
-const MAX_PG_NUM = 32768
+/** Ceph's mon_max_pool_pg_num: no pool gets more PGs. */
+export const MAX_POOL_PG_NUM = 65536
+/** The autoscaler's PG_NUM_MIN: it never aims below this (unless the pool sets pg_num_min). */
+export const AUTOSCALE_PG_NUM_MIN = 32
 
 /** The PG autoscaler sets pg_num (warn: only reports); otherwise pg_num is the pool's own. */
 export const usesPgNum = (pool: Pick<PoolOptions, 'autoscaleMode'>) => pool.autoscaleMode !== 'on'
@@ -190,12 +193,12 @@ export function nearestPowerOfTwo(n: number): number {
 
 /**
  * The pg_num Ceph's autoscaler would pick for a pool holding the cluster's data: `targetPerOsd` PG replicas per OSD,
- * so OSDs × target ÷ pool width, as the nearest power of two.
+ * so OSDs × target ÷ pool width, as the nearest power of two within the autoscaler's minimum and the pool maximum.
  */
 export function suggestPgNum(osdCount: number, scheme: Scheme, targetPerOsd = DEFAULT_PG_TARGET_PER_OSD): number {
   const width = Math.max(1, schemeWidth(scheme))
   const ideal = (Math.max(1, osdCount) * Math.max(1, targetPerOsd)) / width
-  return Math.max(1, Math.min(nearestPowerOfTwo(ideal), MAX_PG_NUM))
+  return Math.max(AUTOSCALE_PG_NUM_MIN, Math.min(nearestPowerOfTwo(ideal), MAX_POOL_PG_NUM))
 }
 
 /** PG replicas (shards) each OSD holds: every PG is placed on `width` OSDs. */

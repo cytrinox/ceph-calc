@@ -270,7 +270,9 @@ IOPS    = min over the pool's classes c of N_eff,c / (reads / R_c + writes / W_c
 
 ### Placement groups (`pool.ts`)
 - **Like Ceph's autoscaler** (checked in its source): `suggestPgNum()` = OSDs × `mon_target_pg_per_osd` ÷ pool width,
-  rounded with `nearestPowerOfTwo()` (Ceph's `nearest_power_of_two`). The target is a step 5 setting
+  rounded with `nearestPowerOfTwo()` (Ceph's `nearest_power_of_two`), at least `AUTOSCALE_PG_NUM_MIN` (32, the
+  autoscaler's `PG_NUM_MIN`) and at most `MAX_POOL_PG_NUM` (65,536, `mon_max_pool_pg_num`; the recommendation's
+  formula names the cap when it applies). The target is a step 5 setting
   (`pgTargetPerOsd`, default 100 like every Ceph release up to Tentacle; Ceph's development branch raises it to 200
   and `mon_max_pg_per_osd` from 250 to 500, commit d34fa3316f. Link key `pg`).
 - **`pg_num`** (default 32, Ceph's `osd_pool_default_pg_num`) is used and shown with the autoscaler off or in warn

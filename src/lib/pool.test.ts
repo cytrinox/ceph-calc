@@ -50,7 +50,8 @@ describe('pool options', () => {
     expect(suggestPgNum(40, rep3)).toBe(1024) // 40 × 100 ÷ 3 = 1333 (Ceph's default target up to Tentacle)
     expect(suggestPgNum(40, rep3, 200)).toBe(2048) // 2667 (Ceph's development branch)
     expect(suggestPgNum(8, ec42)).toBe(128) // 8 × 100 ÷ 6 = 133
-    expect(suggestPgNum(10_000, rep3)).toBe(32768) // capped
+    expect(suggestPgNum(10_000, rep3)).toBe(65536) // 333,333 → 262,144, capped at mon_max_pool_pg_num
+    expect(suggestPgNum(8, rep3, 1)).toBe(32) // 2.7 → 2, raised to the autoscaler's PG_NUM_MIN
     expect(pgReplicasPerOsd(2048, rep3, 40)).toBeCloseTo(153.6, 9)
   })
 

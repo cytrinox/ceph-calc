@@ -8,10 +8,13 @@ import { CRUSH_WEIGHT_MAX, initialWeightFor, type CrushWeightOverflow } from './
 import { formatInt, formatIops, formatPct } from './format'
 import { describeCost, estimateIops, ioSizeLabel, opCosts, type IopsBasis } from './iops'
 import {
+  AUTOSCALE_PG_NUM_MIN,
   DEFAULT_PG_TARGET_PER_OSD,
   DEFAULT_POOL_PG_NUM,
   EC_OPTIMIZATION_PLUGINS,
   MAX_PG_PER_OSD,
+  MAX_POOL_PG_NUM,
+  nearestPowerOfTwo,
   PG_AUTOSCALE_THRESHOLD,
   pgReplicasPerOsd,
   suggestPgNum,
@@ -577,11 +580,14 @@ export function pgNumRecommendation({
   const copies = scheme.kind === 'replicated' ? 'copies' : 'shards'
   const ideal = (osdCount * target) / width
   const raw = ideal < 10 ? ideal.toFixed(1) : formatInt(Math.round(ideal))
-  // Short lines: the block fits a phone without scrolling.
+  const rounded = nearestPowerOfTwo(ideal)
+  // Short lines: the block fits a phone without scrolling. A fourth line names the limit when it changes the result.
   const formula = [
     `pg_num ≈ OSDs × PG target ÷ ${copies}`,
     `       = ${formatInt(osdCount)} × ${formatInt(target)} ÷ ${width} = ${raw}`,
-    `       → closest power of two: ${suggested}`,
+    `       → closest power of two: ${rounded}`,
+    ...(suggested > rounded ? [`       → at least ${AUTOSCALE_PG_NUM_MIN} (the autoscaler's minimum)`] : []),
+    ...(suggested < rounded ? [`       → at most ${MAX_POOL_PG_NUM} (mon_max_pool_pg_num)`] : []),
   ].join('\n')
   const perOsd = (pg: number) => {
     const n = pgReplicasPerOsd(pg, scheme, osdCount)

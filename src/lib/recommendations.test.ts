@@ -316,7 +316,7 @@ describe('EC optimizations recommendation', () => {
 describe('pg_num recommendation', () => {
   const none = { ...ratios, recoveryReserve: 0 }
   // 5 hosts × 8 OSDs = 40 OSDs
-  const pgRecs = (pool: Partial<PoolOptions>, pgTargetPerOsd?: number, scheme: Scheme = rep3) => {
+  const pgRecs = (pool: Partial<PoolOptions>, pgTargetPerOsd?: number, scheme: Scheme = rep3, osdCount = 40) => {
     const input = hosts(5)
     return recommendations({
       input,
@@ -325,7 +325,7 @@ describe('pg_num recommendation', () => {
       scheme,
       domain: 'host',
       pool: { ...defaultPoolOptions(), ...pool },
-      osdCount: 40,
+      osdCount,
       pgTargetPerOsd,
     })
   }
@@ -382,6 +382,24 @@ describe('pg_num recommendation', () => {
       '       → closest power of two: 512',
     ])
     expect(rec.details.join(' ')).toContain('every PG lives on 6 OSDs (its shards)')
+  })
+
+  it('names the limit when it changes the rounded value', () => {
+    // 40 × 1 ÷ 3 = 13 → 16, below the autoscaler's minimum
+    const low = find(pgRecs({ autoscaleMode: 'off', pgNum: 64 }, 1))!
+    expect(low.title).toBe('Set pg_num to 32')
+    expect(low.formula?.split('\n').slice(2)).toEqual([
+      '       → closest power of two: 16',
+      "       → at least 32 (the autoscaler's minimum)",
+    ])
+    // 10,000 × 100 ÷ 3 = 333,333 → 262,144, above mon_max_pool_pg_num
+    const high = find(pgRecs({ autoscaleMode: 'off' }, undefined, rep3, 10_000))!
+    expect(high.title).toBe('Set pg_num to 65536')
+    expect(high.formula?.split('\n').slice(1)).toEqual([
+      '       = 10,000 × 100 ÷ 3 = 333,333',
+      '       → closest power of two: 262144',
+      '       → at most 65536 (mon_max_pool_pg_num)',
+    ])
   })
 
   it('is only for pools with their own pg_num that differs', () => {
