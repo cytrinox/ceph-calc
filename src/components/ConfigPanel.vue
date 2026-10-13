@@ -157,7 +157,9 @@ const headroomSummary = computed(() => {
 })
 const poolSummary = computed(() => {
   const pool = props.state.pool
-  return `${pool.name || 'data'} · ${pool.application} · autoscale ${pool.autoscaleMode}`
+  // stripe_unit belongs to the EC profile, so it only shows for EC pools.
+  const stripeUnit = props.state.scheme.kind === 'ec' ? [`stripe_unit ${ioSizeLabel(pool.stripeUnitKiB)}`] : []
+  return [pool.name || 'data', pool.application, ...stripeUnit, `autoscale ${pool.autoscaleMode}`].join(' · ')
 })
 const miscSummary = computed(() => {
   const st = props.state
