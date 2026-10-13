@@ -15,7 +15,7 @@ const ecDoc = helpDocs.find((d) => d.name === 'ec-sharding-and-iops')
     </div>
 
     <div class="items">
-      <details :id="FAQ_IDS.realNet" class="item" open>
+      <details :id="FAQ_IDS.realNet" class="item">
         <summary>
           <AppIcon name="chevron" :size="14" class="caret" />
           <span>Why is the real net capacity lower than the capacity on other Ceph calculators?</span>
