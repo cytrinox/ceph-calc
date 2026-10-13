@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en" data-theme="dark">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="color-scheme" content="dark" />
+    <!-- Overview page (/help/) and the template of every help document: build/help.ts fills the placeholders. -->
+    <meta name="description" content="<!--help:description-->" />
+    <link rel="icon" href="/favicon.ico" sizes="48x48" />
+    <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
+    <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+    <meta name="theme-color" media="(prefers-color-scheme: light)" content="#f3f5fa" />
+    <meta name="theme-color" media="(prefers-color-scheme: dark)" content="#0b1120" />
+    <title><!--help:title--></title>
+    <script>
+      // The calculator's saved theme (or the system's), before first paint.
+      try {
+        var t = localStorage.getItem('ceph-calculator-theme')
+        if (t !== 'light' && t !== 'dark') t = matchMedia('(prefers-color-scheme: light)').matches ? 'light' : 'dark'
+        document.documentElement.dataset.theme = t
+        document.querySelector('meta[name="color-scheme"]').setAttribute('content', t)
+      } catch (e) {}
+    </script>
+  </head>
+  <body>
+    <header class="help-header">
+      <a class="home" href="/">
+        <img src="/favicon.svg" alt="" width="36" height="36" />
+        <span>The ceph real net capacity calculator</span>
+      </a>
+      <div class="header-actions">
+        <a class="nav-button" href="/" aria-label="Back to the calculator">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M19 12H5m6-6-6 6 6 6" />
+          </svg>
+          <span>Back to the calculator</span>
+        </a>
+        <a class="nav-button" href="/help/" aria-label="Help documents">
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9.1 9a3 3 0 0 1 5.8 1c0 2-3 3-3 3M12 17h.01M12 2a10 10 0 1 0 0 20 10 10 0 0 0 0-20z" />
+          </svg>
+          <span>Help</span>
+        </a>
+        <!-- The calculator's theme toggle (src/help/main.ts mounts it). -->
+        <div id="theme-toggle" class="theme-toggle"></div>
+      </div>
+    </header>
+    <main class="help-main"><!--help:content--></main>
+    <script type="module" src="/src/help/main.ts"></script>
+  </body>
+</html>

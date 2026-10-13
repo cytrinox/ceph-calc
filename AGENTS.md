@@ -47,6 +47,12 @@ src/
     crushTree.ts          virtual `ceph osd crush tree` output of the topology (step 5 "Create virtual CRUSH map")
     faq.ts                FAQ anchor ids + openFaq()
   styles/                 _tokens.scss (breakpoints, fonts, mixins), _themes.scss (colour tokens), main.scss
+  help/                   entry and styles of the help pages (main.ts, help.scss)
+help/
+  index.html              help page template and overview (/help/), a second Vite entry
+  docs/                   help documents: <name>.md (one page each) and img/*.svg figures
+build/
+  icons.ts / help.ts      Vite plugins: raster icons from favicon.svg; help pages from help/docs
 ```
 
 **Data flow:**
@@ -287,6 +293,33 @@ IOPS    = min over the pool's classes c of N_eff,c / (reads / R_c + writes / W_c
 - **`allow_ec_optimizations`:** emitted with a note (Tentacle or later, cannot be disabled). `poolIssues` flags
   plugins/techniques other than jerasure or isa with `reed_sol_van`. A `stripe_unit` below 16K is not an issue but
   a recommendation (`stripeUnitRecommendation`, adoptable).
+
+## Help documents (`help/`, `build/help.ts`)
+
+- **Add a document:** drop `help/docs/<name>.md` (lowercase, dashes) with a frontmatter of `title`, `description`,
+  `author`, `published` (YYYY-MM-DD) and optionally `author-link` (http/https), `revised` (not before `published`; set
+  it when changing a document's content) and `order` (lower first). The byline below the title reads "by Author,
+  published 13 October 2026 · revised …" (no revised date when it equals `published`); invalid dates or links fail the build. Nothing else to register: it becomes `/help/<name>/`, appears on `/help/` and in
+  the FAQ entry "What help documents are available?" (`virtual:help-docs`). Tests render every document.
+- **Markdown** (markdown-it): headings get ids (deep links; the h2s form the table of contents), ```` ```formula ````
+  fences become formula blocks, tables work. Keep the house style of the FAQ.
+- **Figures:** `![Caption](img/x.svg)` on its own line inlines the SVG as a `<figure>` with the alt text as
+  caption, so its shapes can use the theme through classes (`canvas`, `box`, `data`, `parity`, `line`,
+  `accent-line`, `highlight`, `label`, `title`, `muted`, `on-data`, `on-parity`, `warning-text`; styled in
+  `src/help/help.scss`). Give every shape a fallback colour as attribute, use no ids (several figures share a page)
+  and keep text short: figures keep a minimum width and scroll sideways on phones. A missing figure fails the build.
+- **Pages:** `help/index.html` is a Vite entry (fonts, themes, `main.scss` + `help.scss` via `src/help/main.ts`) and
+  the template with `<!--help:title|description|content-->` placeholders. The build fills it as the overview and
+  emits `help/<name>/index.html` per document (`generateBundle`); dev renders `/help/<name>/` on request and
+  reloads on edits. Links in pages are absolute. Navigation is buttons with icon and caption (`navButton`):
+  "Back to the calculator" and "Help" in the header (icons only on phones), "All help documents" and "Back to the
+  calculator" at the end of a page. The header also has the calculator's `ThemeToggle`, mounted by
+  `src/help/main.ts` (same saved setting; Vue is a chunk shared with the app). The calculator's header links here
+  with a "Help" button left of its theme toggle (`App.vue`; icon only on phones, like Share). nginx redirects
+  `/help/<name>` to `/help/<name>/`; keep `absolute_redirect off` in `nginx.conf`, or the redirect points at the
+  container's own port 8080.
+- **Numbers in documents** come from the model: a test checks the ones in `ec-sharding-and-iops.md` against
+  `estimateIops`. Update the document when the model changes.
 
 ## Container, nginx and CI
 - **Image:** multi-stage `Containerfile`. The Node 22 build stage runs on the build platform and runs the tests; the

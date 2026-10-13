@@ -1,0 +1,385 @@
+// Help pages: header, article and figures. Base styles, fonts and theme colours come from styles/main.scss.
+
+.help-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 1.4rem $gutter 0.6rem;
+
+  a {
+    text-decoration: none;
+  }
+
+  .home {
+    color: inherit;
+    display: inline-flex;
+    align-items: center;
+    gap: 0.7rem;
+    font-family: $font-display;
+    font-weight: 700;
+    font-size: 1.05rem;
+
+    &:hover span {
+      color: var(--accent-text);
+    }
+  }
+
+}
+
+// Back to the calculator, help and theme toggle, top right.
+.header-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+// On phones the header buttons show only their icons (their aria-label names them).
+@include below($bp-sm) {
+  .help-header .nav-button {
+    padding: 0;
+    width: 44px;
+    justify-content: center;
+
+    span {
+      display: none;
+    }
+  }
+}
+
+// Keeps the toggle's place until it is mounted, so the header doesn't shift.
+.theme-toggle {
+  min-width: 42px;
+  min-height: 42px;
+
+  @include touch {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}
+
+// Navigation as buttons (header, end of every page), like the buttons in the calculator's cards.
+.nav-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  min-height: 36px;
+  padding: 0 0.95rem;
+  border: 1px solid var(--border-strong);
+  border-radius: 999px;
+  background: var(--panel-alt);
+  color: var(--text);
+  font-size: 0.88rem;
+  font-weight: 500;
+  white-space: nowrap;
+  text-decoration: none;
+
+  svg {
+    flex: 0 0 auto;
+  }
+
+  &:hover {
+    border-color: var(--accent);
+    color: var(--accent-text);
+  }
+
+  @include touch {
+    min-height: 44px;
+  }
+}
+
+.page-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+  margin-top: 2.2rem;
+  padding-top: 1.2rem;
+  border-top: 1px solid var(--border);
+}
+
+.help-main {
+  max-width: 820px;
+  margin: 0 auto;
+  padding: 0 $gutter 3rem;
+}
+
+.doc {
+  margin-top: 0.8rem;
+  padding: 1.6rem 1.8rem 1.8rem;
+  border: 1px solid var(--border);
+  border-radius: $radius-lg;
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  line-height: 1.65;
+
+  @include below($bp-sm) {
+    padding: 1.1rem 1rem 1.3rem;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-family: $font-display;
+    line-height: 1.25;
+    scroll-margin-top: 1rem;
+  }
+
+  h1 {
+    margin: 0.2rem 0 0.4rem;
+    font-size: 1.8rem;
+  }
+
+  h2 {
+    margin: 2.2rem 0 0.6rem;
+    padding-top: 1.2rem;
+    border-top: 1px solid var(--border);
+    font-size: 1.3rem;
+  }
+
+  h3 {
+    margin: 1.5rem 0 0.4rem;
+    font-size: 1.05rem;
+  }
+
+  p,
+  ul,
+  ol {
+    margin: 0 0 0.8rem;
+  }
+
+  a:not(.nav-button) {
+    color: var(--accent-text);
+  }
+
+  code {
+    font-family: $font-mono;
+    font-size: 0.88em;
+  }
+
+  // Inline code in running text, not in formula or code blocks.
+  :not(pre) > code {
+    padding: 0.05em 0.3em;
+    border-radius: 4px;
+    background: var(--panel-alt);
+  }
+
+  pre {
+    margin: 0 0 1rem;
+    padding: 0.7rem 0.9rem;
+    border-radius: $radius-sm;
+    background: var(--code-bg);
+    color: var(--code-text);
+    font-family: $font-mono;
+    font-size: 0.84rem;
+    line-height: 1.6;
+    overflow-x: auto;
+  }
+
+  // Like the FAQ's formula blocks.
+  .formula {
+    white-space: pre;
+  }
+
+  table {
+    width: 100%;
+    margin: 0 0 1rem;
+    border-collapse: collapse;
+    font-size: 0.9rem;
+    display: block;
+    overflow-x: auto;
+  }
+
+  th,
+  td {
+    padding: 0.4rem 0.6rem;
+    border-bottom: 1px solid var(--border);
+    text-align: left;
+    vertical-align: top;
+  }
+
+  th {
+    font-weight: 600;
+    color: var(--text-muted);
+  }
+
+  blockquote {
+    margin: 0 0 1rem;
+    padding: 0.6rem 0.9rem;
+    border-left: 3px solid var(--accent);
+    border-radius: 0 $radius-sm $radius-sm 0;
+    background: var(--accent-soft);
+
+    p:last-child {
+      margin-bottom: 0;
+    }
+  }
+}
+
+// Author and dates, below the title.
+.doc .byline {
+  margin: 0 0 0.6rem;
+  color: var(--text-faint);
+  font-size: 0.85rem;
+
+  a {
+    color: inherit;
+    text-decoration-style: dotted;
+  }
+}
+
+.lead {
+  color: var(--text-muted);
+  font-size: 1.05rem;
+}
+
+.toc {
+  margin: 1rem 0 0.5rem;
+  padding: 0.8rem 1rem;
+  border-radius: $radius;
+  background: var(--panel-alt);
+  font-size: 0.92rem;
+
+  p {
+    margin: 0 0 0.3rem;
+    font-weight: 600;
+  }
+
+  ol {
+    margin: 0;
+    padding-left: 1.3rem;
+  }
+}
+
+.doc-list {
+  padding: 0;
+  list-style: none;
+
+  li {
+    padding: 0.8rem 0;
+    border-bottom: 1px solid var(--border);
+
+    // The page navigation below has its own line.
+    &:last-child {
+      border-bottom: 0;
+    }
+  }
+
+  a {
+    font-family: $font-display;
+    font-weight: 700;
+    font-size: 1.1rem;
+  }
+
+  p {
+    margin: 0.2rem 0 0;
+    color: var(--text-muted);
+  }
+}
+
+// Inline SVG figures (help/docs/img/*.svg): shapes carry classes, so they follow the theme. The files' own colours
+// are fallbacks for viewing them on their own.
+.figure {
+  margin: 1.2rem 0 1.4rem;
+  // On phones the figure keeps a readable size and scrolls sideways instead of shrinking its text.
+  overflow-x: auto;
+
+  svg {
+    display: block;
+    width: 100%;
+    min-width: 600px;
+    height: auto;
+    font-family: $font-sans;
+  }
+
+  figcaption {
+    position: sticky;
+    left: 0;
+    margin-top: 0.4rem;
+    color: var(--text-muted);
+    font-size: 0.85rem;
+    text-align: center;
+  }
+
+  .canvas {
+    fill: var(--panel-alt);
+  }
+
+  .box {
+    fill: var(--panel);
+    stroke: var(--border-strong);
+  }
+
+  .data {
+    fill: var(--accent);
+  }
+
+  .parity {
+    fill: var(--protection);
+  }
+
+  .faint {
+    opacity: 0.35;
+  }
+
+  .line {
+    fill: none;
+    stroke: var(--text-faint);
+  }
+
+  .arrowhead {
+    fill: var(--text-faint);
+  }
+
+  .highlight {
+    fill: none;
+    stroke: var(--warning);
+    stroke-width: 2.5;
+  }
+
+  .accent-line {
+    fill: none;
+    stroke: var(--accent-text);
+    stroke-width: 2;
+  }
+
+  .label {
+    fill: var(--text);
+    font-size: 13px;
+  }
+
+  .title {
+    fill: var(--text);
+    font-family: $font-display;
+    font-size: 14px;
+    font-weight: 700;
+  }
+
+  .muted {
+    fill: var(--text-muted);
+    font-size: 11px;
+  }
+
+  .on-data {
+    fill: var(--on-accent);
+    font-family: $font-mono;
+    font-size: 11px;
+  }
+
+  .on-parity {
+    fill: #fff;
+    font-family: $font-mono;
+    font-size: 11px;
+  }
+
+  .mono {
+    font-family: $font-mono;
+  }
+
+  .warning-text {
+    fill: var(--warning);
+    font-size: 12px;
+    font-weight: 600;
+  }
+}

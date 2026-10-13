@@ -1,0 +1,83 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 314" width="760" height="314" font-family="IBM Plex Sans, sans-serif" role="img" aria-label="From client data to OSDs">
+  <rect class="canvas" x="0" y="0" width="760" height="314" rx="12" fill="#0b1120"/>
+  <text class="label" x="40" y="26" text-anchor="start" fill="#e8edf6" font-size="13">An RBD image or CephFS file (16M), cut into RADOS objects of 4M</text>
+  <rect class="data" x="40" y="36" width="166" height="34" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="123" y="57" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">object 0 · 4M</text>
+  <rect class="data" x="210" y="36" width="166" height="34" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="293" y="57" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">object 1 · 4M</text>
+  <rect class="data" x="380" y="36" width="166" height="34" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="463" y="57" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">object 2 · 4M</text>
+  <rect class="data" x="550" y="36" width="166" height="34" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="633" y="57" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">object 3 · 4M</text>
+  <text class="muted" x="720" y="94" text-anchor="end" fill="#96a3bb" font-size="11">hash(object name) → PG</text>
+  <rect class="box" x="100" y="112" width="120" height="30" rx="4" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="label mono" x="160" y="132" text-anchor="middle" fill="#e8edf6" font-size="13" font-family="IBM Plex Mono, monospace">PG 2.07</text>
+  <rect class="box" x="320" y="112" width="120" height="30" rx="4" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="label mono" x="380" y="132" text-anchor="middle" fill="#e8edf6" font-size="13" font-family="IBM Plex Mono, monospace">PG 2.1a</text>
+  <rect class="box" x="540" y="112" width="120" height="30" rx="4" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="label mono" x="600" y="132" text-anchor="middle" fill="#e8edf6" font-size="13" font-family="IBM Plex Mono, monospace">PG 2.3f</text>
+  <rect class="highlight" x="320" y="112" width="120" height="30" rx="4" fill="none" stroke="#fbbf24" stroke-width="2.5"/>
+  <line class="accent-line" x1="123" y1="72" x2="373.1" y2="109.0" fill="none" stroke="#5eead4" stroke-width="2"/>
+  <polygon class="arrowhead" points="380,110 373.7,105.0 372.5,112.9" fill="#6a7790"/>
+  <line class="line" x1="293" y1="72" x2="166.7" y2="108.1" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="160,110 167.8,111.9 165.6,104.2" fill="#6a7790"/>
+  <line class="line" x1="463" y1="72" x2="593.3" y2="108.1" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="600,110 594.3,104.3 592.2,112.0" fill="#6a7790"/>
+  <line class="accent-line" x1="633" y1="72" x2="386.9" y2="109.0" fill="none" stroke="#5eead4" stroke-width="2"/>
+  <polygon class="arrowhead" points="380,110 387.5,112.9 386.3,105.0" fill="#6a7790"/>
+  <rect class="box" x="48" y="196" width="104" height="82" rx="8" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="muted" x="100" y="213" text-anchor="middle" fill="#96a3bb" font-size="11">host 1</text>
+  <rect class="box" x="56" y="222" width="40" height="26" rx="4" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="muted mono" x="76" y="239" text-anchor="middle" fill="#96a3bb" font-size="11" font-family="IBM Plex Mono, monospace">osd.0</text>
+  <rect class="data" x="104" y="222" width="40" height="26" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="124" y="239" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">osd.1</text>
+  <line class="accent-line" x1="380" y1="144" x2="130.9" y2="192.7" fill="none" stroke="#5eead4" stroke-width="2"/>
+  <polygon class="arrowhead" points="124,194 131.6,196.6 130.1,188.7" fill="#6a7790"/>
+  <text class="muted" x="124" y="268" text-anchor="middle" fill="#96a3bb" font-size="11">shard 0</text>
+  <rect class="box" x="160" y="196" width="104" height="82" rx="8" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="muted" x="212" y="213" text-anchor="middle" fill="#96a3bb" font-size="11">host 2</text>
+  <rect class="data" x="168" y="222" width="40" height="26" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="188" y="239" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">osd.2</text>
+  <line class="accent-line" x1="380" y1="144" x2="194.8" y2="192.2" fill="none" stroke="#5eead4" stroke-width="2"/>
+  <polygon class="arrowhead" points="188,194 195.8,196.1 193.8,188.4" fill="#6a7790"/>
+  <text class="muted" x="188" y="268" text-anchor="middle" fill="#96a3bb" font-size="11">shard 1</text>
+  <rect class="box" x="216" y="222" width="40" height="26" rx="4" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="muted mono" x="236" y="239" text-anchor="middle" fill="#96a3bb" font-size="11" font-family="IBM Plex Mono, monospace">osd.3</text>
+  <rect class="box" x="272" y="196" width="104" height="82" rx="8" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="muted" x="324" y="213" text-anchor="middle" fill="#96a3bb" font-size="11">host 3</text>
+  <rect class="box" x="280" y="222" width="40" height="26" rx="4" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="muted mono" x="300" y="239" text-anchor="middle" fill="#96a3bb" font-size="11" font-family="IBM Plex Mono, monospace">osd.4</text>
+  <rect class="data" x="328" y="222" width="40" height="26" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="348" y="239" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">osd.5</text>
+  <line class="accent-line" x1="380" y1="144" x2="351.8" y2="188.1" fill="none" stroke="#5eead4" stroke-width="2"/>
+  <polygon class="arrowhead" points="348,194 355.1,190.3 348.4,185.9" fill="#6a7790"/>
+  <text class="muted" x="348" y="268" text-anchor="middle" fill="#96a3bb" font-size="11">shard 2</text>
+  <rect class="box" x="384" y="196" width="104" height="82" rx="8" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="muted" x="436" y="213" text-anchor="middle" fill="#96a3bb" font-size="11">host 4</text>
+  <rect class="data" x="392" y="222" width="40" height="26" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="412" y="239" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">osd.6</text>
+  <line class="accent-line" x1="380" y1="144" x2="408.2" y2="188.1" fill="none" stroke="#5eead4" stroke-width="2"/>
+  <polygon class="arrowhead" points="412,194 411.6,185.9 404.9,190.3" fill="#6a7790"/>
+  <text class="muted" x="412" y="268" text-anchor="middle" fill="#96a3bb" font-size="11">shard 3</text>
+  <rect class="box" x="440" y="222" width="40" height="26" rx="4" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="muted mono" x="460" y="239" text-anchor="middle" fill="#96a3bb" font-size="11" font-family="IBM Plex Mono, monospace">osd.7</text>
+  <rect class="box" x="496" y="196" width="104" height="82" rx="8" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="muted" x="548" y="213" text-anchor="middle" fill="#96a3bb" font-size="11">host 5</text>
+  <rect class="box" x="504" y="222" width="40" height="26" rx="4" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="muted mono" x="524" y="239" text-anchor="middle" fill="#96a3bb" font-size="11" font-family="IBM Plex Mono, monospace">osd.8</text>
+  <rect class="data" x="552" y="222" width="40" height="26" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="572" y="239" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">osd.9</text>
+  <line class="accent-line" x1="380" y1="144" x2="565.2" y2="192.2" fill="none" stroke="#5eead4" stroke-width="2"/>
+  <polygon class="arrowhead" points="572,194 566.2,188.4 564.2,196.1" fill="#6a7790"/>
+  <text class="muted" x="572" y="268" text-anchor="middle" fill="#96a3bb" font-size="11">shard 4</text>
+  <rect class="box" x="608" y="196" width="104" height="82" rx="8" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="muted" x="660" y="213" text-anchor="middle" fill="#96a3bb" font-size="11">host 6</text>
+  <rect class="data" x="616" y="222" width="40" height="26" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="636" y="239" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">osd.10</text>
+  <line class="accent-line" x1="380" y1="144" x2="629.1" y2="192.7" fill="none" stroke="#5eead4" stroke-width="2"/>
+  <polygon class="arrowhead" points="636,194 629.9,188.7 628.4,196.6" fill="#6a7790"/>
+  <text class="muted" x="636" y="268" text-anchor="middle" fill="#96a3bb" font-size="11">shard 5</text>
+  <rect class="box" x="664" y="222" width="40" height="26" rx="4" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="muted mono" x="684" y="239" text-anchor="middle" fill="#96a3bb" font-size="11" font-family="IBM Plex Mono, monospace">osd.11</text>
+  <text class="muted" x="40" y="300" text-anchor="start" fill="#96a3bb" font-size="11">CRUSH → acting set of PG 2.1a: k+m = 6 OSDs on 6 different hosts (EC 4+2)</text>
+</svg>

@@ -1,0 +1,76 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 290" width="760" height="290" font-family="IBM Plex Sans, sans-serif" role="img" aria-label="An 8M read split over two 4M objects">
+  <rect class="canvas" x="0" y="0" width="760" height="290" rx="12" fill="#0b1120"/>
+  <text class="label" x="40" y="26" text-anchor="start" fill="#e8edf6" font-size="13">A client read of 8M on 4M objects</text>
+  <rect class="box" x="40" y="36" width="680" height="30" rx="4" fill="#16213a" stroke="#2e3c5a"/>
+  <rect class="highlight" x="40" y="36" width="680" height="30" rx="4" fill="none" stroke="#fbbf24" stroke-width="2.5"/>
+  <text class="label mono" x="380" y="56" text-anchor="middle" fill="#e8edf6" font-size="13" font-family="IBM Plex Mono, monospace">client read · 8M</text>
+  <line class="line" x1="208" y1="68" x2="208.0" y2="79.0" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="208,86 212.0,79.0 204.0,79.0" fill="#6a7790"/>
+  <rect class="data" x="40" y="90" width="336" height="30" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="208" y="110" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">object 0 · 4M</text>
+  <line class="line" x1="552" y1="68" x2="552.0" y2="79.0" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="552,86 556.0,79.0 548.0,79.0" fill="#6a7790"/>
+  <rect class="data" x="384" y="90" width="336" height="30" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="552" y="110" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">object 1 · 4M</text>
+  <line class="line" x1="208" y1="122" x2="208.0" y2="135.0" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="208,142 212.0,135.0 204.0,135.0" fill="#6a7790"/>
+  <text class="muted" x="216" y="136" text-anchor="start" fill="#96a3bb" font-size="11">RADOS operation 1</text>
+  <rect class="box" x="148" y="146" width="120" height="28" rx="4" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="label mono" x="208" y="165" text-anchor="middle" fill="#e8edf6" font-size="13" font-family="IBM Plex Mono, monospace">PG 2.1a</text>
+  <line class="line" x1="208" y1="176" x2="86.9" y2="198.7" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="80,200 87.6,202.6 86.1,194.8" fill="#6a7790"/>
+  <rect class="data" x="58" y="202" width="44" height="24" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="80" y="218" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">osd.1</text>
+  <line class="line" x1="208" y1="176" x2="138.7" y2="197.9" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="132,200 139.9,201.7 137.5,194.1" fill="#6a7790"/>
+  <rect class="data" x="110" y="202" width="44" height="24" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="132" y="218" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">osd.2</text>
+  <line class="line" x1="208" y1="176" x2="188.9" y2="195.1" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="184,200 191.8,197.9 186.1,192.2" fill="#6a7790"/>
+  <rect class="data" x="162" y="202" width="44" height="24" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="184" y="218" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">osd.5</text>
+  <line class="line" x1="208" y1="176" x2="230.7" y2="195.4" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="236,200 233.3,192.4 228.1,198.5" fill="#6a7790"/>
+  <rect class="data" x="214" y="202" width="44" height="24" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="236" y="218" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">osd.6</text>
+  <line class="line" x1="208" y1="176" x2="281.3" y2="198.0" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="288,200 282.4,194.2 280.1,201.8" fill="#6a7790"/>
+  <rect class="parity" x="266" y="202" width="44" height="24" rx="4" fill="#1a5478"/>
+  <text class="on-parity mono" x="288" y="218" text-anchor="middle" fill="#ffffff" font-size="11" font-family="IBM Plex Mono, monospace">osd.9</text>
+  <line class="line" x1="208" y1="176" x2="333.1" y2="198.7" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="340,200 333.8,194.8 332.4,202.7" fill="#6a7790"/>
+  <rect class="parity" x="318" y="202" width="44" height="24" rx="4" fill="#1a5478"/>
+  <text class="on-parity mono" x="340" y="218" text-anchor="middle" fill="#ffffff" font-size="11" font-family="IBM Plex Mono, monospace">osd.10</text>
+  <text class="muted" x="208" y="246" text-anchor="middle" fill="#96a3bb" font-size="11">4 OSD reads of 1M (k = 4)</text>
+  <line class="line" x1="552" y1="122" x2="552.0" y2="135.0" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="552,142 556.0,135.0 548.0,135.0" fill="#6a7790"/>
+  <text class="muted" x="560" y="136" text-anchor="start" fill="#96a3bb" font-size="11">RADOS operation 2</text>
+  <rect class="box" x="492" y="146" width="120" height="28" rx="4" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="label mono" x="552" y="165" text-anchor="middle" fill="#e8edf6" font-size="13" font-family="IBM Plex Mono, monospace">PG 2.07</text>
+  <line class="line" x1="552" y1="176" x2="430.9" y2="198.7" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="424,200 431.6,202.6 430.1,194.8" fill="#6a7790"/>
+  <rect class="data" x="402" y="202" width="44" height="24" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="424" y="218" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">osd.0</text>
+  <line class="line" x1="552" y1="176" x2="482.7" y2="197.9" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="476,200 483.9,201.7 481.5,194.1" fill="#6a7790"/>
+  <rect class="data" x="454" y="202" width="44" height="24" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="476" y="218" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">osd.3</text>
+  <line class="line" x1="552" y1="176" x2="532.9" y2="195.1" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="528,200 535.8,197.9 530.1,192.2" fill="#6a7790"/>
+  <rect class="data" x="506" y="202" width="44" height="24" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="528" y="218" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">osd.4</text>
+  <line class="line" x1="552" y1="176" x2="574.7" y2="195.4" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="580,200 577.3,192.4 572.1,198.5" fill="#6a7790"/>
+  <rect class="data" x="558" y="202" width="44" height="24" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="580" y="218" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">osd.7</text>
+  <line class="line" x1="552" y1="176" x2="625.3" y2="198.0" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="632,200 626.4,194.2 624.1,201.8" fill="#6a7790"/>
+  <rect class="parity" x="610" y="202" width="44" height="24" rx="4" fill="#1a5478"/>
+  <text class="on-parity mono" x="632" y="218" text-anchor="middle" fill="#ffffff" font-size="11" font-family="IBM Plex Mono, monospace">osd.8</text>
+  <line class="line" x1="552" y1="176" x2="677.1" y2="198.7" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="684,200 677.8,194.8 676.4,202.7" fill="#6a7790"/>
+  <rect class="parity" x="662" y="202" width="44" height="24" rx="4" fill="#1a5478"/>
+  <text class="on-parity mono" x="684" y="218" text-anchor="middle" fill="#ffffff" font-size="11" font-family="IBM Plex Mono, monospace">osd.11</text>
+  <text class="muted" x="552" y="246" text-anchor="middle" fill="#96a3bb" font-size="11">4 OSD reads of 1M (k = 4)</text>
+  <text class="warning-text" x="380" y="274" text-anchor="middle" fill="#fbbf24" font-size="12" font-weight="600">8M read = 2 RADOS operations = 8 OSD reads: half the IOPS of a 4M read</text>
+</svg>

@@ -343,6 +343,10 @@ watch(
       <div class="top-actions">
         <UnitToggle />
         <ShareButton :state="state" />
+        <a class="help-button" href="/help/" title="Help documents" aria-label="Help documents">
+          <AppIcon name="help" :size="16" />
+          <span class="text">Help</span>
+        </a>
         <ThemeToggle />
       </div>
     </header>
@@ -443,6 +447,48 @@ watch(
   align-items: center;
   gap: 0.5rem;
   flex: 0 0 auto;
+}
+
+// Like the Share button next to it: icon only on phones.
+.help-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45rem;
+  height: 42px;
+  padding: 0 1rem;
+  border-radius: 999px;
+  border: 1px solid var(--border);
+  background: var(--panel);
+  box-shadow: var(--shadow);
+  color: var(--text);
+  font-weight: 500;
+  font-size: 0.88rem;
+  white-space: nowrap;
+  text-decoration: none;
+  transition: border-color 0.15s, color 0.15s;
+
+  svg {
+    color: var(--accent-text);
+  }
+
+  &:hover {
+    border-color: var(--accent);
+    color: var(--accent-text);
+  }
+
+  @include touch {
+    height: 44px;
+  }
+
+  @include below($bp-sm) {
+    width: 44px;
+    padding: 0;
+    justify-content: center;
+
+    .text {
+      display: none;
+    }
+  }
 }
 
 .brand {

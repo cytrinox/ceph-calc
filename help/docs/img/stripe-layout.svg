@@ -1,0 +1,108 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 760 324" width="760" height="324" font-family="IBM Plex Sans, sans-serif" role="img" aria-label="An object in an EC 4+2 pool: stripes, strips and shards">
+  <rect class="canvas" x="0" y="0" width="760" height="324" rx="12" fill="#0b1120"/>
+  <text class="label" x="40" y="26" text-anchor="start" fill="#e8edf6" font-size="13">One object of 32K with stripe_unit 4K: 8 strips, s0 to s7</text>
+  <rect class="data" x="40" y="36" width="81" height="30" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="80.5" y="55" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s0</text>
+  <rect class="data" x="125" y="36" width="81" height="30" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="165.5" y="55" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s1</text>
+  <rect class="data" x="210" y="36" width="81" height="30" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="250.5" y="55" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s2</text>
+  <rect class="data" x="295" y="36" width="81" height="30" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="335.5" y="55" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s3</text>
+  <rect class="data" x="380" y="36" width="81" height="30" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="420.5" y="55" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s4</text>
+  <rect class="data" x="465" y="36" width="81" height="30" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="505.5" y="55" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s5</text>
+  <rect class="data" x="550" y="36" width="81" height="30" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="590.5" y="55" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s6</text>
+  <rect class="data" x="635" y="36" width="81" height="30" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="675.5" y="55" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s7</text>
+  <text class="muted" x="210" y="84" text-anchor="middle" fill="#96a3bb" font-size="11">stripe 0 = k × stripe_unit = 16K</text>
+  <text class="muted" x="550" y="84" text-anchor="middle" fill="#96a3bb" font-size="11">stripe 1</text>
+  <line class="line" x1="42" y1="72" x2="376" y2="72" fill="none" stroke="#6a7790"/>
+  <line class="line" x1="382" y1="72" x2="716" y2="72" fill="none" stroke="#6a7790"/>
+  <text class="muted" x="185" y="118" text-anchor="middle" fill="#96a3bb" font-size="11">shard 0</text>
+  <text class="muted" x="285" y="118" text-anchor="middle" fill="#96a3bb" font-size="11">shard 1</text>
+  <text class="muted" x="385" y="118" text-anchor="middle" fill="#96a3bb" font-size="11">shard 2</text>
+  <text class="muted" x="485" y="118" text-anchor="middle" fill="#96a3bb" font-size="11">shard 3</text>
+  <text class="muted" x="585" y="118" text-anchor="middle" fill="#96a3bb" font-size="11">shard 4 (parity)</text>
+  <text class="muted" x="685" y="118" text-anchor="middle" fill="#96a3bb" font-size="11">shard 5 (parity)</text>
+  <text class="muted" x="40" y="147" text-anchor="start" fill="#96a3bb" font-size="11">stripe 0</text>
+  <rect class="data" x="140" y="128" width="90" height="26" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="185" y="145" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s0</text>
+  <rect class="data" x="240" y="128" width="90" height="26" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="285" y="145" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s1</text>
+  <rect class="data" x="340" y="128" width="90" height="26" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="385" y="145" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s2</text>
+  <rect class="data" x="440" y="128" width="90" height="26" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="485" y="145" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s3</text>
+  <rect class="parity" x="540" y="128" width="90" height="26" rx="4" fill="#1a5478"/>
+  <text class="on-parity mono" x="585" y="145" text-anchor="middle" fill="#ffffff" font-size="11" font-family="IBM Plex Mono, monospace">p0</text>
+  <rect class="parity" x="640" y="128" width="90" height="26" rx="4" fill="#1a5478"/>
+  <text class="on-parity mono" x="685" y="145" text-anchor="middle" fill="#ffffff" font-size="11" font-family="IBM Plex Mono, monospace">q0</text>
+  <text class="muted" x="40" y="179" text-anchor="start" fill="#96a3bb" font-size="11">stripe 1</text>
+  <rect class="data" x="140" y="160" width="90" height="26" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="185" y="177" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s4</text>
+  <rect class="data" x="240" y="160" width="90" height="26" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="285" y="177" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s5</text>
+  <rect class="data" x="340" y="160" width="90" height="26" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="385" y="177" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s6</text>
+  <rect class="data" x="440" y="160" width="90" height="26" rx="4" fill="#4cb1d7"/>
+  <text class="on-data mono" x="485" y="177" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s7</text>
+  <rect class="parity" x="540" y="160" width="90" height="26" rx="4" fill="#1a5478"/>
+  <text class="on-parity mono" x="585" y="177" text-anchor="middle" fill="#ffffff" font-size="11" font-family="IBM Plex Mono, monospace">p1</text>
+  <rect class="parity" x="640" y="160" width="90" height="26" rx="4" fill="#1a5478"/>
+  <text class="on-parity mono" x="685" y="177" text-anchor="middle" fill="#ffffff" font-size="11" font-family="IBM Plex Mono, monospace">q1</text>
+  <line class="line" x1="185" y1="190" x2="185.0" y2="213.0" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="185,220 189.0,213.0 181.0,213.0" fill="#6a7790"/>
+  <line class="line" x1="285" y1="190" x2="285.0" y2="213.0" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="285,220 289.0,213.0 281.0,213.0" fill="#6a7790"/>
+  <line class="line" x1="385" y1="190" x2="385.0" y2="213.0" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="385,220 389.0,213.0 381.0,213.0" fill="#6a7790"/>
+  <line class="line" x1="485" y1="190" x2="485.0" y2="213.0" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="485,220 489.0,213.0 481.0,213.0" fill="#6a7790"/>
+  <line class="line" x1="585" y1="190" x2="585.0" y2="213.0" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="585,220 589.0,213.0 581.0,213.0" fill="#6a7790"/>
+  <line class="line" x1="685" y1="190" x2="685.0" y2="213.0" fill="none" stroke="#6a7790"/>
+  <polygon class="arrowhead" points="685,220 689.0,213.0 681.0,213.0" fill="#6a7790"/>
+  <text class="muted" x="40" y="250" text-anchor="start" fill="#96a3bb" font-size="11">OSDs</text>
+  <text class="muted" x="40" y="266" text-anchor="start" fill="#96a3bb" font-size="11">(shard</text>
+  <text class="muted" x="40" y="280" text-anchor="start" fill="#96a3bb" font-size="11">objects)</text>
+  <rect class="box" x="140" y="224" width="90" height="70" rx="8" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="label mono" x="185" y="242" text-anchor="middle" fill="#e8edf6" font-size="13" font-family="IBM Plex Mono, monospace">osd.3</text>
+  <rect class="data" x="147" y="254" width="37" height="24" rx="3" fill="#4cb1d7"/>
+  <rect class="data" x="186" y="254" width="37" height="24" rx="3" fill="#4cb1d7"/>
+  <text class="on-data mono" x="165.5" y="270" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s0</text>
+  <text class="on-data mono" x="204.5" y="270" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s4</text>
+  <rect class="box" x="240" y="224" width="90" height="70" rx="8" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="label mono" x="285" y="242" text-anchor="middle" fill="#e8edf6" font-size="13" font-family="IBM Plex Mono, monospace">osd.7</text>
+  <rect class="data" x="247" y="254" width="37" height="24" rx="3" fill="#4cb1d7"/>
+  <rect class="data" x="286" y="254" width="37" height="24" rx="3" fill="#4cb1d7"/>
+  <text class="on-data mono" x="265.5" y="270" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s1</text>
+  <text class="on-data mono" x="304.5" y="270" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s5</text>
+  <rect class="box" x="340" y="224" width="90" height="70" rx="8" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="label mono" x="385" y="242" text-anchor="middle" fill="#e8edf6" font-size="13" font-family="IBM Plex Mono, monospace">osd.12</text>
+  <rect class="data" x="347" y="254" width="37" height="24" rx="3" fill="#4cb1d7"/>
+  <rect class="data" x="386" y="254" width="37" height="24" rx="3" fill="#4cb1d7"/>
+  <text class="on-data mono" x="365.5" y="270" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s2</text>
+  <text class="on-data mono" x="404.5" y="270" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s6</text>
+  <rect class="box" x="440" y="224" width="90" height="70" rx="8" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="label mono" x="485" y="242" text-anchor="middle" fill="#e8edf6" font-size="13" font-family="IBM Plex Mono, monospace">osd.18</text>
+  <rect class="data" x="447" y="254" width="37" height="24" rx="3" fill="#4cb1d7"/>
+  <rect class="data" x="486" y="254" width="37" height="24" rx="3" fill="#4cb1d7"/>
+  <text class="on-data mono" x="465.5" y="270" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s3</text>
+  <text class="on-data mono" x="504.5" y="270" text-anchor="middle" fill="#032421" font-size="11" font-family="IBM Plex Mono, monospace">s7</text>
+  <rect class="box" x="540" y="224" width="90" height="70" rx="8" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="label mono" x="585" y="242" text-anchor="middle" fill="#e8edf6" font-size="13" font-family="IBM Plex Mono, monospace">osd.21</text>
+  <rect class="parity" x="547" y="254" width="37" height="24" rx="3" fill="#1a5478"/>
+  <rect class="parity" x="586" y="254" width="37" height="24" rx="3" fill="#1a5478"/>
+  <text class="on-parity mono" x="565.5" y="270" text-anchor="middle" fill="#ffffff" font-size="11" font-family="IBM Plex Mono, monospace">p0</text>
+  <text class="on-parity mono" x="604.5" y="270" text-anchor="middle" fill="#ffffff" font-size="11" font-family="IBM Plex Mono, monospace">p1</text>
+  <rect class="box" x="640" y="224" width="90" height="70" rx="8" fill="#16213a" stroke="#2e3c5a"/>
+  <text class="label mono" x="685" y="242" text-anchor="middle" fill="#e8edf6" font-size="13" font-family="IBM Plex Mono, monospace">osd.26</text>
+  <rect class="parity" x="647" y="254" width="37" height="24" rx="3" fill="#1a5478"/>
+  <rect class="parity" x="686" y="254" width="37" height="24" rx="3" fill="#1a5478"/>
+  <text class="on-parity mono" x="665.5" y="270" text-anchor="middle" fill="#ffffff" font-size="11" font-family="IBM Plex Mono, monospace">q0</text>
+  <text class="on-parity mono" x="704.5" y="270" text-anchor="middle" fill="#ffffff" font-size="11" font-family="IBM Plex Mono, monospace">q1</text>
+  <text class="muted" x="380" y="312" text-anchor="middle" fill="#96a3bb" font-size="11">Every OSD holds one shard of every stripe, back to back: a request needs one contiguous read per OSD</text>
+</svg>

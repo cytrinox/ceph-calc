@@ -1,6 +1,10 @@
 <script setup lang="ts">
+import helpDocs from 'virtual:help-docs'
 import AppIcon from './AppIcon.vue'
 import { FAQ_IDS } from '@/lib/faq'
+
+// The help document behind the IOPS entry (help/docs/ec-sharding-and-iops.md).
+const ecDoc = helpDocs.find((d) => d.name === 'ec-sharding-and-iops')
 </script>
 
 <template>
@@ -190,6 +194,9 @@ import { FAQ_IDS } from '@/lib/faq'
             busiest OSDs are saturated.
             Each client operation costs OSD operations, depending on the pool layout:
           </p>
+          <p v-if="ecDoc">
+            There's a longer explanation with figures: <a :href="ecDoc.url">{{ ecDoc.title }}</a>.
+          </p>
           <table class="costs">
             <thead>
               <tr>
@@ -333,11 +340,44 @@ N_eff,c = capacity of all OSDs ÷ capacity of the largest OSD of class c</pre>
           </p>
         </div>
       </details>
+
+      <details :id="FAQ_IDS.help" class="item">
+        <summary>
+          <AppIcon name="chevron" :size="14" class="caret" />
+          <span>What help documents are available?</span>
+        </summary>
+        <div class="answer">
+          <ul class="help-docs">
+            <li v-for="doc in helpDocs" :key="doc.name">
+              <a :href="doc.url">{{ doc.title }}</a>
+              <span>{{ doc.description }}</span>
+            </li>
+          </ul>
+          <p>Overview: <a href="/help/">/help/</a></p>
+        </div>
+      </details>
     </div>
   </section>
 </template>
 
 <style lang="scss" scoped>
+.answer a {
+  color: var(--accent-text);
+}
+
+// "What help documents are available?": title link, description below.
+.help-docs {
+  display: grid;
+  gap: 0.6rem;
+  padding-left: 1.1rem;
+
+  li span {
+    display: block;
+    color: var(--text-muted);
+    font-size: 0.86rem;
+  }
+}
+
 .items {
   display: grid;
   gap: 0.6rem;
