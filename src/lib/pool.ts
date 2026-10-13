@@ -2,6 +2,8 @@
 // validation. commands.ts turns them into Ceph commands.
 
 import { schemeWidth, type Scheme } from './ceph'
+import { formatInt } from './format'
+import { ioSizeLabel } from './iops'
 import { isValidDeviceClass, type DomainType } from './topology'
 
 export const APPLICATIONS = ['rbd', 'cephfs', 'rgw', 'none'] as const
@@ -48,6 +50,59 @@ export const EC_OPTIMIZATION_PLUGINS: readonly EcPlugin[] = ['jerasure', 'isa']
 
 /** Techniques that only work with exactly two coding chunks. */
 export const M2_ONLY_TECHNIQUES: readonly EcTechnique[] = ['reed_sol_r6_op', 'liberation', 'blaum_roth', 'liber8tion']
+
+/**
+ * Bytes jerasure aligns each chunk to (ErasureCodeJerasure::get_alignment ÷ k): w × 4 for the Reed-Solomon
+ * techniques, w × packetsize × 4 for the others, with Ceph's defaults packetsize 2048 and w 8 (7 for liberation and
+ * blaum_roth). The isa plugin aligns to 32 bytes.
+ */
+const JERASURE_PACKETSIZE = 2048
+const JERASURE_W: Record<EcTechnique, number> = {
+  reed_sol_van: 8,
+  reed_sol_r6_op: 8,
+  cauchy_orig: 8,
+  cauchy_good: 8,
+  liberation: 7,
+  blaum_roth: 7,
+  liber8tion: 8,
+  cauchy: 8,
+}
+const PACKET_TECHNIQUES: readonly EcTechnique[] = ['cauchy_orig', 'cauchy_good', 'liberation', 'blaum_roth', 'liber8tion']
+
+function jerasureChunkAlignment(technique: EcTechnique): number {
+  return JERASURE_W[technique] * 4 * (PACKET_TECHNIQUES.includes(technique) ? JERASURE_PACKETSIZE : 1)
+}
+
+/** Sub-chunks per chunk of a clay code with its default d = k+m−1 (ErasureCodeClay::parse): q^t with q = m. */
+export function claySubChunks(k: number, m: number): number {
+  const q = m
+  const nu = (k + m) % q ? q - ((k + m) % q) : 0
+  return q ** ((k + m + nu) / q)
+}
+
+/**
+ * Bytes Ceph rounds a chunk of the profile up to when it creates the pool (OSDMonitor::prepare_pool_stripe_width →
+ * get_chunk_size): jerasure's alignment, times clay's sub-chunk count (a clay chunk holds q^t sub-chunks of the
+ * scalar code's alignment). 32 for isa, which every stripe_unit satisfies.
+ */
+export function chunkAlignmentBytes(pool: Pick<PoolOptions, 'ecPlugin' | 'ecTechnique'>, k: number, m: number): number {
+  if (pool.ecPlugin === 'isa') return 32
+  const jerasure = jerasureChunkAlignment(pool.ecTechnique)
+  return pool.ecPlugin === 'clay' ? claySubChunks(k, m) * jerasure : jerasure
+}
+
+/** The chunk size Ceph stores for the profile, in bytes: the stripe_unit padded to the plugin's chunk alignment. */
+export function effectiveChunkBytes(
+  pool: Pick<PoolOptions, 'ecPlugin' | 'ecTechnique' | 'stripeUnitKiB'>,
+  k: number,
+  m: number,
+): number {
+  const align = chunkAlignmentBytes(pool, k, m)
+  return Math.ceil((pool.stripeUnitKiB * 1024) / align) * align
+}
+
+/** "64K", or "5,184 bytes" when it isn't a whole number of KiB. */
+const bytesLabel = (n: number) => (n % 1024 === 0 ? ioSizeLabel(n / 1024) : `${formatInt(n)} bytes`)
 
 export interface PoolOptions {
   name: string
@@ -231,8 +286,22 @@ export function poolIssues(pool: PoolOptions, scheme: Scheme): string[] {
   if (scheme.kind === 'ec') {
     if (!TECHNIQUES_BY_PLUGIN[pool.ecPlugin].includes(pool.ecTechnique)) {
       issues.push(`Technique ${pool.ecTechnique} is not available for the ${pool.ecPlugin} plugin.`)
-    } else if (M2_ONLY_TECHNIQUES.includes(pool.ecTechnique) && scheme.m !== 2) {
-      issues.push(`Technique ${pool.ecTechnique} requires m = 2.`)
+    } else {
+      if (M2_ONLY_TECHNIQUES.includes(pool.ecTechnique) && scheme.m !== 2) {
+        issues.push(`Technique ${pool.ecTechnique} requires m = 2.`)
+      }
+      // clay's d (default k+m−1) must lie between k+1 and k+m−1, which needs m ≥ 2.
+      if (pool.ecPlugin === 'clay' && scheme.m < 2) issues.push('The clay plugin needs m ≥ 2: its d must lie between k+1 and k+m−1.')
+      // Ceph accepts any stripe_unit in the profile and pads the chunks to the plugin's alignment without a word.
+      const unit = ioSizeLabel(pool.stripeUnitKiB)
+      const chunk = effectiveChunkBytes(pool, scheme.k, scheme.m)
+      if (chunk !== pool.stripeUnitKiB * 1024) {
+        const why =
+          pool.ecPlugin === 'clay'
+            ? `clay stores chunks as ${formatInt(claySubChunks(scheme.k, scheme.m))} sub-chunks of ${formatInt(jerasureChunkAlignment(pool.ecTechnique))} bytes`
+            : `jerasure aligns ${pool.ecTechnique} chunks to w × packetsize × 4 bytes (${JERASURE_W[pool.ecTechnique]} × ${JERASURE_PACKETSIZE} × 4)`
+        issues.push(`stripe_unit ${unit} is padded to ${bytesLabel(chunk)}: ${why}. The IOPS estimate uses ${unit}.`)
+      }
     }
     if (pool.ecOptimizations) {
       // A stripe_unit below 16K is a recommendation (recommendations.ts), not an issue.

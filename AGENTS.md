@@ -292,7 +292,12 @@ IOPS    = min over the pool's classes c of N_eff,c / (reads / R_c + writes / W_c
   - CRUSH rules: `rep3_host`, `ec4-2_rack_nvme` (k and m separated, so EC 2+11 and EC 21+1 don't collide);
   - EC profiles: `ec-4-2-rack-nvme`.
 - **EC techniques:** `TECHNIQUES_BY_PLUGIN` lists only what each plugin accepts (clay: no `liberation` and no
-  `blaum_roth`).
+  `blaum_roth`; clay also needs m ≥ 2).
+- **Padded `stripe_unit`:** Ceph takes any `stripe_unit` in the profile and rounds the chunks up to the plugin's
+  alignment when it creates the pool (`effectiveChunkBytes`, checked against `get_chunk_size` in the Ceph source):
+  jerasure's Cauchy and Liberation techniques align to w × packetsize × 4 bytes (64K, 56K with w = 7), clay to q^t
+  sub-chunks of that (`claySubChunks`); `reed_sol_van` and isa keep the value. `poolIssues` says so, because the
+  IOPS estimate uses the nominal `stripe_unit`.
 - **`allow_ec_optimizations`:** emitted with a note (Tentacle or later, cannot be disabled). `poolIssues` flags
   plugins/techniques other than jerasure or isa with `reed_sol_van`. A `stripe_unit` below 16K is not an issue but
   a recommendation (`stripeUnitRecommendation`, adoptable).

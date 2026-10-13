@@ -1,7 +1,9 @@
 import { describe, expect, it } from 'vitest'
 import {
+  claySubChunks,
   compressedCapacityTB,
   defaultPoolOptions,
+  effectiveChunkBytes,
   defaultProfileName,
   defaultRuleName,
   effectiveRuleName,
@@ -78,15 +80,43 @@ describe('pool options', () => {
 
   it('checks EC technique against plugin and m', () => {
     const base = defaultPoolOptions()
-    expect(poolIssues({ ...base, ecTechnique: 'liberation' }, ec42)).toEqual([])
-    expect(poolIssues({ ...base, ecTechnique: 'liberation' }, { kind: 'ec', k: 4, m: 3 })).toEqual([
+    const mIssue = expect.stringContaining('requires m')
+    expect(poolIssues({ ...base, ecTechnique: 'liberation' }, ec42)).not.toContainEqual(mIssue)
+    expect(poolIssues({ ...base, ecTechnique: 'liberation' }, { kind: 'ec', k: 4, m: 3 })).toContain(
       'Technique liberation requires m = 2.',
-    ])
+    )
     expect(poolIssues({ ...base, ecPlugin: 'isa', ecTechnique: 'cauchy_good' }, ec42)[0]).toMatch(/not available/)
     // clay (scalar_mds jerasure) accepts neither liberation nor blaum_roth
     expect(poolIssues({ ...base, ecPlugin: 'clay', ecTechnique: 'liberation' }, ec42)[0]).toMatch(/not available/)
     expect(poolIssues({ ...base, ecPlugin: 'clay', ecTechnique: 'blaum_roth' }, ec42)[0]).toMatch(/not available/)
-    expect(poolIssues({ ...base, ecPlugin: 'clay', ecTechnique: 'liber8tion' }, ec42)).toEqual([])
+    expect(poolIssues({ ...base, ecPlugin: 'clay', ecTechnique: 'liber8tion' }, ec42)).not.toContainEqual(
+      expect.stringContaining('not available'),
+    )
+    // clay's d (k+m−1 by default) must lie between k+1 and k+m−1
+    expect(poolIssues({ ...base, ecPlugin: 'clay' }, { kind: 'ec', k: 4, m: 1 })).toEqual([
+      'The clay plugin needs m ≥ 2: its d must lie between k+1 and k+m−1.',
+    ])
+  })
+
+  it("reports a stripe_unit that Ceph pads to the technique's chunk alignment", () => {
+    const base = defaultPoolOptions() // jerasure, reed_sol_van, 4K: aligned to 32 bytes
+    expect(poolIssues(base, ec42)).toEqual([])
+    expect(poolIssues({ ...base, ecPlugin: 'isa', ecTechnique: 'cauchy' }, ec42)).toEqual([])
+    // Cauchy and Liberation techniques align to w × packetsize × 4 bytes: 64K (56K with w = 7)
+    expect(poolIssues({ ...base, ecTechnique: 'cauchy_good' }, ec42)).toEqual([
+      'stripe_unit 4K is padded to 64K: jerasure aligns cauchy_good chunks to w × packetsize × 4 bytes (8 × 2048 × 4). The IOPS estimate uses 4K.',
+    ])
+    expect(poolIssues({ ...base, ecTechnique: 'cauchy_good', stripeUnitKiB: 128 }, ec42)).toEqual([])
+    expect(poolIssues({ ...base, ecTechnique: 'liberation' }, ec42)[0]).toContain('is padded to 56K')
+    expect(effectiveChunkBytes({ ...base, ecTechnique: 'blaum_roth', stripeUnitKiB: 128 }, 4, 2)).toBe(3 * 57344)
+    // clay: q^t sub-chunks of the scalar code's alignment per chunk. 4+2 → 8 × 32 bytes (4K fits), 8+3 → 81 × 32
+    expect(claySubChunks(4, 2)).toBe(8)
+    expect(claySubChunks(8, 3)).toBe(81)
+    expect(poolIssues({ ...base, ecPlugin: 'clay' }, ec42)).toEqual([])
+    expect(poolIssues({ ...base, ecPlugin: 'clay' }, { kind: 'ec', k: 8, m: 3 })).toEqual([
+      'stripe_unit 4K is padded to 5,184 bytes: clay stores chunks as 81 sub-chunks of 32 bytes. The IOPS estimate uses 4K.',
+    ])
+    expect(effectiveChunkBytes({ ...base, ecPlugin: 'clay', ecTechnique: 'cauchy_good' }, 4, 2)).toBe(8 * 65536)
   })
 
   it('checks EC optimizations against plugin and technique', () => {
@@ -95,7 +125,7 @@ describe('pool options', () => {
     expect(poolIssues({ ...opt, ecPlugin: 'isa' }, ec42)).toEqual([])
     const unsupported = 'EC optimizations need the jerasure or isa plugin with reed_sol_van.'
     expect(poolIssues({ ...opt, ecPlugin: 'clay' }, ec42)).toEqual([unsupported])
-    expect(poolIssues({ ...opt, ecTechnique: 'cauchy_good' }, ec42)).toEqual([unsupported])
+    expect(poolIssues({ ...opt, ecTechnique: 'cauchy_good', stripeUnitKiB: 64 }, ec42)).toEqual([unsupported])
     // a small stripe_unit is a recommendation, not an issue
     expect(poolIssues({ ...opt, stripeUnitKiB: 4 }, ec42)).toEqual([])
     // replicated pools ignore EC settings
