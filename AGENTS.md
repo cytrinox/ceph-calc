@@ -307,8 +307,9 @@ IOPS    = min over the pool's classes c of N_eff,c / (reads / R_c + writes / W_c
 - **Add a document:** drop `help/docs/<name>.md` (lowercase, dashes) with a frontmatter of `title`, `description`,
   `author`, `published` (YYYY-MM-DD) and optionally `author-link` (http/https), `revised` (not before `published`; set
   it when changing a document's content) and `order` (lower first). The byline below the title reads "by Author,
-  published 13 October 2026 · revised …" (no revised date when it equals `published`); invalid dates or links fail the build. Nothing else to register: it becomes `/help/<name>/`, appears on `/help/` and in
-  the FAQ entry "What help documents are available?" (`virtual:help-docs`). Tests render every document.
+  published 13 October 2026 · revised …" (no revised date when it equals `published`); invalid dates or links fail the build. Nothing else to register: it becomes `/help/<name>/` and
+  appears on `/help/`, which the header's Help button opens. FAQ answers can link to a document through
+  `virtual:help-docs` (the IOPS answer does). Tests render every document.
 - **Markdown** (markdown-it): headings get ids (deep links; the h2s form the table of contents), ```` ```formula ````
   fences become formula blocks, tables work. Keep the house style of the FAQ.
 - **Figures:** `![Caption](img/x.svg)` on its own line inlines the SVG as a `<figure>` with the alt text as

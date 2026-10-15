@@ -279,7 +279,7 @@ const RESOLVED_ID = '\0' + VIRTUAL_ID
  * - build: help/index.html (a Vite entry) becomes the overview, and every document gets help/<name>/index.html from
  *   the same template (its asset URLs are absolute, so they work one folder deeper);
  * - dev: /help/<name>/ is rendered on request, edits in help/docs/ reload the page;
- * - `virtual:help-docs` lists the documents for the app (the FAQ).
+ * - `virtual:help-docs` lists the documents for the app (FAQ answers link to them).
  */
 export function helpPlugin(helpDir: string): Plugin {
   const docsDir = join(helpDir, 'docs')
