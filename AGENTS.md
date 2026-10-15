@@ -328,6 +328,10 @@ IOPS    = min over the pool's classes c of N_eff,c / (reads / R_c + writes / W_c
   container's own port 8080.
 - **Numbers in documents** come from the model: a test checks the ones in `ec-sharding-and-iops.md` against
   `estimateIops`. Update the document when the model changes.
+- **Changelog** (`changelog.md`, `order: 0`, always listed first; a test checks that): when tagging a release
+  `vX.Y.Z`, add a section `## vX.Y.Z · <day> <Month> <year>` on top and set `revised`. Write what users notice, in
+  plain language; leave out internal changes (CI, refactoring, docs for developers, channel switches). A test keeps
+  the headings in that format, newest first.
 
 ## Container, nginx and CI
 - **Image:** multi-stage `Containerfile`. The Node 22 build stage runs on the build platform and runs the tests; the

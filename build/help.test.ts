@@ -120,6 +120,24 @@ describe('help documents', () => {
     }
   })
 
+  it('lists the changelog first, with versions and dates newest first', () => {
+    expect(helpDocs(docsDir)[0].name).toBe('changelog')
+    const text = readFileSync(join(docsDir, 'changelog.md'), 'utf8')
+    const headings = [...text.matchAll(/^## (.*)$/gm)].map((m) => m[1])
+    expect(headings.length).toBeGreaterThan(0)
+    const versions = headings.map((h) => {
+      const match = /^v(\d+)\.(\d+)\.(\d+) · (\d{1,2} [A-Z][a-z]+ \d{4})$/.exec(h)
+      expect(match, h).not.toBeNull()
+      return { parts: match!.slice(1, 4).map(Number), date: Date.parse(match![4]) }
+    })
+    for (let i = 1; i < versions.length; i++) {
+      const [a, b] = [versions[i - 1], versions[i]]
+      const newer = a.parts[0] - b.parts[0] || a.parts[1] - b.parts[1] || a.parts[2] - b.parts[2]
+      expect(newer, `${headings[i - 1]} before ${headings[i]}`).toBeGreaterThan(0)
+      expect(a.date, `${headings[i - 1]} before ${headings[i]}`).toBeGreaterThanOrEqual(b.date)
+    }
+  })
+
   it('states the numbers the IOPS model computes (ec-sharding-and-iops)', () => {
     const text = readFileSync(join(docsDir, 'ec-sharding-and-iops.md'), 'utf8')
     const rep3 = { kind: 'replicated' as const, size: 3, minSize: 2 }

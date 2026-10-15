@@ -74,8 +74,10 @@ Source: <https://github.com/cytrinox/ceph-calc>
   panel brings every setting back to its default (after asking; theme, unit and open steps stay).
 - Link previews (Open Graph / X card) with a screenshot of the calculator.
 - Help documents with figures, each at its own URL: `/help/` lists them (reached by the help button in the header,
-  and listed in the FAQ entry "What help documents are available?"), e.g. `/help/ec-sharding-and-iops/` on how EC pools lay out objects, stripes and shards
-  and how the IOPS are estimated. They are written in Markdown and rendered to static pages at build time.
+  and listed in the FAQ entry "What help documents are available?"). The changelog (`/help/changelog/`) always
+  comes first and summarises each version in plain language; `/help/ec-sharding-and-iops/` explains how EC pools
+  lay out objects, stripes and shards and how the IOPS are estimated. They are written in Markdown and rendered to
+  static pages at build time.
 - **TB / TiB** switch for all results (bar, tables, chart, warnings). Inputs such as OSD sizes stay in decimal TB,
   as drives are sold that way; TiB matches what `ceph df` reports.
 - FAQ panel: why the real net capacity is lower than on other calculators (with the formula and worked
