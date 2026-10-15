@@ -5,7 +5,14 @@ order: 0
 author: Daniel Vogelbacher (cytrinox)
 author-link: https://www.chaospixel.com
 published: 2026-10-14
+revised: 2026-10-15
 ---
+
+## v0.3.0 · 15 October 2026
+
+- New FAQ entry **"How is this calculated?"**: the capacity model step by step, each formula worked through with
+  the numbers of your current setup. The example updates as you change the cluster.
+- The FAQ no longer lists the help documents; the Help button in the header leads to them directly.
 
 ## v0.2.1 · 13 October 2026
 
