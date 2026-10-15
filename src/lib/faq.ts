@@ -2,6 +2,7 @@
 
 export const FAQ_IDS = {
   realNet: 'faq-real-net-capacity',
+  calculation: 'faq-calculation',
   recoveryReserve: 'faq-recovery-reserve',
   iops: 'faq-iops',
 } as const

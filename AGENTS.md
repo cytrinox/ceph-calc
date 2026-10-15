@@ -45,6 +45,7 @@ src/
     recommendations.ts    recommendations from the result (nearfull ratio for the recovery reserve), applied as overrides
     iops.ts               IOPS estimate: OSD ops per client op (opCosts), capacity-weighted OSD count, ceiling
     crushTree.ts          virtual `ceph osd crush tree` output of the topology (step 5 "Create virtual CRUSH map")
+    calculation.ts        the current setup's numbers for the FAQ "How is this calculated?" (formats, computes nothing new)
     faq.ts                FAQ anchor ids + openFaq()
   styles/                 _tokens.scss (breakpoints, fonts, mixins), _themes.scss (colour tokens), main.scss
   help/                   entry and styles of the help pages (main.ts, help.scss)

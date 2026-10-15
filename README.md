@@ -81,7 +81,9 @@ Source: <https://github.com/cytrinox/ceph-calc>
 - **TB / TiB** switch for all results (bar, tables, chart, warnings). Inputs such as OSD sizes stay in decimal TB,
   as drives are sold that way; TiB matches what `ceph df` reports.
 - FAQ panel: why the real net capacity is lower than on other calculators (with the formula and worked
-  examples) and what the recovery reserve is for. The **?** buttons next to the Real net capacity heading
+  examples), how every value is calculated (step by step, worked through with the numbers of the current setup),
+  what the recovery reserve is
+  for and how the IOPS are estimated. The **?** buttons next to the Real net capacity heading
   and the recovery reserve field jump to the matching answer.
 - A release channel badge next to the title (`dev` by default, `beta` in GitHub builds) and a footer disclaimer
   that all results are estimates.

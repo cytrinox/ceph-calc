@@ -37,6 +37,7 @@ import { defaultState, readStateFromUrl, writeStateToUrl, type AppState } from '
 import { channelTitle, versionLink } from './lib/version'
 import { BASIC_IOPS, estimateIops, hasIops, iopsBasis } from './lib/iops'
 import { recommendations, type SetupChange } from './lib/recommendations'
+import { explainCalculation } from './lib/calculation'
 
 // Same calculator pictogram as the favicon (served from public/).
 const logoUrl = `${import.meta.env.BASE_URL}favicon.svg`
@@ -302,6 +303,20 @@ const price = computed(() => {
   }
 })
 
+// The FAQ entry "How is this calculated?" works through the current setup.
+const calculation = computed(() =>
+  explainCalculation({
+    input: input.value,
+    result: result.value,
+    scheme: state.scheme,
+    tunables: tunables.value,
+    domain: state.failureDomain,
+    pool: state.pool,
+    pricePerTB: num(state.pricePerTB),
+    currency: state.currency,
+  }),
+)
+
 function selectScheme(scheme: Scheme) {
   state.scheme = scheme
 }
@@ -396,7 +411,7 @@ watch(
           :pg-target-per-osd="state.pgTargetPerOsd"
           :objectSizeKiB="state.objectSizeKiB"
         />
-        <FaqPanel />
+        <FaqPanel :calculation="calculation" />
       </div>
     </main>
 

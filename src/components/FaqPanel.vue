@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import helpDocs from 'virtual:help-docs'
 import AppIcon from './AppIcon.vue'
+import type { CalculationExample } from '@/lib/calculation'
 import { FAQ_IDS } from '@/lib/faq'
+
+/** The current setup, worked through for "How is this calculated?". */
+defineProps<{ calculation: CalculationExample }>()
 
 // The help document behind the IOPS entry (help/docs/ec-sharding-and-iops.md).
 const ecDoc = helpDocs.find((d) => d.name === 'ec-sharding-and-iops')
@@ -115,6 +119,108 @@ const ecDoc = helpDocs.find((d) => d.name === 'ec-sharding-and-iops')
               <code>1.00</code> and the recovery reserve to <code>0</code> (step 3, Headroom).
             </span>
           </p>
+        </div>
+      </details>
+
+      <details :id="FAQ_IDS.calculation" class="item">
+        <summary>
+          <AppIcon name="chevron" :size="14" class="caret" />
+          <span>How is this calculated?</span>
+        </summary>
+        <div class="answer">
+          <p>
+            All capacities are computed in decimal TB, as drives are sold; the TB/TiB switch only changes how results
+            are shown. Three symbols come up everywhere:
+          </p>
+          <dl class="terms">
+            <dt><code>w</code></dt>
+            <dd>Copies or shards per object: <code>size</code> for replication, k+m for erasure coding.</dd>
+            <dt><code>f</code></dt>
+            <dd>The share of the stored data that is your data: 1/size or k/(k+m).</dd>
+            <dt><code>N</code></dt>
+            <dd>The recovery reserve (step 3), counted in failure domains.</dd>
+          </dl>
+
+          <p class="example-title">1. Raw capacity</p>
+          <pre class="formula">raw = sum of all OSD sizes</pre>
+          <p>
+            Hosts outside every bucket of the failure-domain type (e.g. a host directly under the root while spreading
+            across racks) can't be used by the CRUSH rule. Their capacity, <code>outside</code>, is unusable.
+          </p>
+
+          <p class="example-title">2. Placeable capacity P</p>
+          <p>
+            Every object stores one copy or shard in each of w different failure domains, so no domain can hold more
+            than 1/w of the stored data. P is the most raw data that fits under that rule (the sum runs over the
+            failure domains, each with its capacity):
+          </p>
+          <pre class="formula">P = largest S with
+    Σ min(domain, S ÷ w) = S</pre>
+          <p>
+            With equal domains P is everything inside the failure domains. A domain larger than P ÷ w can't be
+            filled completely, and the rest of it is <strong>stranded</strong>:
+          </p>
+          <pre class="formula">stranded = raw − outside − P</pre>
+
+          <p class="example-title">3. Recovery reserve</p>
+          <p>
+            To recover from N failed domains, the data must still fit after the N largest are gone. P_N is the
+            placeable capacity of the remaining domains, computed the same way:
+          </p>
+          <pre class="formula">recovery reserve = P − P_N</pre>
+
+          <p class="example-title">4. Fill limit</p>
+          <p>Even after that recovery, every OSD stays below the nearfull ratio:</p>
+          <pre class="formula">stored = P_N × nearfull
+nearfull headroom = P_N − stored</pre>
+
+          <p class="example-title">5. Real net capacity</p>
+          <pre class="formula">real net   = stored × f
+protection = stored − real net</pre>
+          <p>
+            The capacity bar splits the raw capacity into parts that always add up: real net + protection + reserved
+            headroom (recovery reserve + nearfull headroom) + unusable (stranded + outside failure domains) = raw.
+          </p>
+
+          <p class="example-title">Other values</p>
+          <dl class="terms">
+            <dt>Healthy OSD fill</dt>
+            <dd>stored ÷ P: how full the OSDs are with the planned data and no failure.</dd>
+            <dt>Ratio markers</dt>
+            <dd>
+              P × ratio: where a healthy cluster reaches nearfull, backfillfull and full. “+X until backfillfull” is
+              the data that still fits up to that point: (P × ratio − stored) × f.
+            </dd>
+            <dt>Storage efficiency</dt>
+            <dd>real net ÷ raw.</dd>
+            <dt>Survives losing</dt>
+            <dd><code>size</code> − 1 or m failure domains without losing data.</dd>
+            <dt>Operational losing</dt>
+            <dd>w − <code>min_size</code> failure domains while I/O continues.</dd>
+            <dt>Needs</dt>
+            <dd>w + N failure domains.</dd>
+            <dt>Price</dt>
+            <dd>raw × price per TB; divided by the real net capacity for the cost per usable TB (or TiB).</dd>
+            <dt>Compression</dt>
+            <dd>real net ÷ compression ratio: about how much data fits before it is compressed.</dd>
+            <dt>Recommended nearfull ratio</dt>
+            <dd>the healthy OSD fill, rounded down to two decimals.</dd>
+            <dt>IOPS</dt>
+            <dd>see “How are the IOPS estimated?” below.</dd>
+          </dl>
+
+          <p class="example-title">Your setup</p>
+          <p>{{ calculation.setup }}: {{ calculation.symbols }}.</p>
+          <p v-if="calculation.problem" class="problem">{{ calculation.problem }}</p>
+          <table v-else class="example setup">
+            <tbody v-for="(rows, i) in [calculation.steps, calculation.others]" :key="i">
+              <tr v-for="row in rows" :key="row.label">
+                <th scope="row">{{ row.label }}</th>
+                <td><code>{{ row.formula }}</code></td>
+                <td class="num">{{ row.value }}</td>
+              </tr>
+            </tbody>
+          </table>
         </div>
       </details>
 
@@ -474,6 +580,16 @@ N_eff,c = capacity of all OSDs ÷ capacity of the largest OSD of class c</pre>
   dd {
     margin: 0;
   }
+}
+
+// "How is this calculated?": a setup that can't be placed has no numbers, only the reason.
+.problem {
+  color: var(--danger);
+}
+
+// The steps and the other values of the current setup: one table, so the columns line up, with a gap between.
+.example.setup tbody + tbody tr:first-child > * {
+  border-top: 2px solid var(--border-strong);
 }
 
 .example {
