@@ -497,7 +497,7 @@ const pieces = computed(() => (props.state.scheme.kind === 'ec' ? 'shards' : 'co
         <NumberField
           v-model="state.pgTargetPerOsd"
           label="PG target per OSD"
-          hint="mon_target_pg_per_osd: PG replicas per OSD the autoscaler aims for."
+          hint="PG replicas per OSD the autoscaler aims for."
           :default-value="DEFAULT_PG_TARGET_PER_OSD"
           :min="1"
           :max="MAX_PG_TARGET_PER_OSD"
