@@ -58,7 +58,8 @@ Source: <https://github.com/cytrinox/ceph-calc>
   below 0.85. For replication with size 1 it lists the settings Ceph needs: `mon_allow_pool_size_one` (always part
   of the commands) and `mon_warn_on_pool_no_redundancy false` against the permanent HEALTH_WARN. The commands panel
   applies these with an "Apply recommendations" toggle, one toggle per recommendation. Recommendations that change
-  the setup itself (a recovery reserve of 1 instead of 0, 3 copies instead of 1, hosts instead of OSDs as failure
+  the setup itself (a recovery reserve of 1 instead of 0, 3 copies instead of 1 or 2 — with the hosts to add when
+  there are too few, adopted on the Basic tab and described for the Advanced tree —, hosts instead of OSDs as failure
   domain, each with its cost in real net capacity; EC optimizations for an EC pool, with what they save in OSD
   operations and IOPS, Ceph Tentacle or later; a 16K stripe_unit once they are on; the pg_num the autoscaler would
   aim for when the pool sets its own) have an "Adopt recommendation" button: it changes the inputs, and the

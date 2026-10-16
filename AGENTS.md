@@ -130,7 +130,10 @@ real net = placeable(domains − N largest) × nearfull × f
   fades out (`ADOPTED_MS`, matching the CSS animation). Current adopted kinds, each showing its cost in real net
   capacity:
   - recovery reserve 0 → 1 (only with a spare domain);
-  - replication size 1 → 3 (or 2 with only two domains);
+  - replication size 1 or 2 → 3. With too few failure domains for 3 copies plus the recovery reserve it names how
+    many to add (sized like the most common existing domain, for the capacity note). Only the Basic tab can adopt
+    that: it raises the hosts (or, spreading across OSDs, the OSDs per host; `SetupChange.basic`, with
+    `RecommendationInput.basic` passed only on the Basic tab). On the Advanced tab it only describes the change;
   - failure domain OSDs → hosts (with several hosts). It keeps the recovery reserve, or lowers it as far as needed
     when there are too few hosts for it;
   - `allow_ec_optimizations` for EC pools without it (jerasure/isa with reed_sol_van only), raising `stripe_unit` to
@@ -142,7 +145,7 @@ real net = placeable(domains − N largest) × nearfull × f
   - `stripe_unit` 16K for EC pools with EC optimizations and a smaller one; the change row compares the OSD
     operations at the client I/O size or 16K, whichever is larger.
 - **Severity:** `critical` (red warning sign before the headline) only when the current setup risks data loss, e.g.
-  replication size 1; everything else is `info` (light bulb, the panel's colour).
+  replication size 1, or size 2 with `min_size` 1; everything else is `info` (light bulb, the panel's colour).
 - **Collapsed by default:** each recommendation shows only its pictogram, headline, adopt button and chevron; the
   headline (a button with `aria-expanded`) or the chevron expands the rest. The open state is local, not in links.
 - **New kinds:** add them to `recommendations()` with their own tests. Keep the texts in the `Recommendation` fields so

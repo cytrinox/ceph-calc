@@ -22,7 +22,7 @@ import {
   type PoolOptions,
 } from './pool'
 import { PRESETS } from './schemes'
-import { plural, type DomainType } from './topology'
+import { plural, type BasicTopology, type DomainGroup, type DomainType } from './topology'
 import { formatCapacity } from './units'
 
 export type RatioKey = 'nearfull' | 'backfillfull' | 'full'
@@ -56,6 +56,8 @@ export interface RecommendationInput {
   osdCount?: number
   /** mon_target_pg_per_osd (step 5). */
   pgTargetPerOsd?: number
+  /** The Basic tab's hardware, only while it is the active tab: adopted recommendations can add hosts there. */
+  basic?: BasicTopology
 }
 
 export type MarkerKind = 'nearfull' | 'backfillfull' | 'full' | 'recommended'
@@ -66,6 +68,8 @@ export interface SetupChange {
   scheme?: Scheme
   failureDomain?: DomainType
   pool?: Partial<PoolOptions>
+  /** Basic tab hardware (hosts, OSDs per host). */
+  basic?: Partial<BasicTopology>
 }
 
 /** "Switch parameter X from A to B", with short notes and optional ratio markers. */
@@ -245,47 +249,127 @@ export function recoveryReserveRecommendation({
   }
 }
 
-/** More than one copy for replication size 1: 3x (Ceph's default), or 2x when only 2 domains are available. */
+/** The most common domain capacity (ties: the larger), as the size of domains added to a layout. */
+function typicalDomainTB(groups: DomainGroup[]): number {
+  return groups.reduce((a, b) => (b.mult > a.mult || (b.mult === a.mult && b.capTB > a.capTB) ? b : a)).capTB
+}
+
+/**
+ * 3 copies (Ceph's default) for replication size 1 or 2. When the failure domains can't hold 3 copies plus the
+ * recovery reserve, it says how many to add; adopting adds them only on the Basic tab (the Advanced tree is edited
+ * by hand), where they are hosts (or OSDs per host) like the existing ones.
+ */
 export function replicationRecommendation({
   input,
   result,
   tunables,
   scheme,
   domain,
+  basic,
 }: RecommendationInput): Recommendation | null {
-  if (scheme.kind !== 'replicated' || scheme.size !== 1) return null
-  const target = ['rep3', 'rep2']
-    .map((id) => PRESETS.find((p) => p.id === id)!.scheme)
-    .find((s) => computeCapacity(input, s, tunables).valid)
-  if (!target || target.kind !== 'replicated') return null
-  const better = computeCapacity(input, target, tunables)
-  const size = target.size
-  const domains = plural(domain)
+  if (scheme.kind !== 'replicated' || scheme.size >= 3 || !result.valid || input.groups.length === 0) return null
+  const target = PRESETS.find((p) => p.id === 'rep3')!.scheme
+  const size = scheme.size
+  const reserve = Math.floor(tunables.recoveryReserve || 0)
+  const count = result.domainCount
+  const missing = Math.max(0, schemeWidth(target) + reserve - count)
+  const one = plural(domain, 1)
+
+  // Basic tab, spreading across OSDs: OSDs are added per host, so whole rows of them.
+  const perHost = basic && domain === 'osd' && missing > 0 ? Math.ceil(missing / Math.max(1, basic.hosts)) : 0
+  const added = perHost > 0 ? perHost * basic!.hosts : missing
+  const typicalTB = typicalDomainTB(input.groups)
+  const grown: CapacityInput =
+    added > 0 ? { ...input, groups: [...input.groups, { capTB: typicalTB, mult: added }] } : input
+  const better = computeCapacity(grown, target, tunables)
+  if (!better.valid) return null
+
+  const survives = (n: number) => (n === 0 ? 'survives no failure' : `survives ${n} failed ${plural(domain, n)}`)
+  // In the order of the steps: the hardware (step 1) before the pool layout (step 2).
+  const changes: SettingChange[] = []
+  if (perHost > 0) {
+    changes.push({
+      parameter: 'OSDs per host (step 1)',
+      from: String(basic!.osdsPerHost),
+      to: String(basic!.osdsPerHost + perHost),
+      toNote: `${formatInt(count + added)} OSDs in total`,
+    })
+  } else if (added > 0) {
+    changes.push({
+      parameter: `${plural(domain)} (step 1)`,
+      from: formatInt(count),
+      to: formatInt(count + added),
+      toNote: `like the existing ones (${formatCapacity(typicalTB)})`,
+    })
+  }
+  changes.push({
+    parameter: 'pool layout (step 2)',
+    from: `size ${size}`,
+    fromNote: `${formatCapacity(result.usableTB)} real net capacity, ${survives(result.failuresTolerated)}`,
+    to: 'size 3',
+    toNote: `${formatCapacity(better.usableTB)} real net capacity, ${survives(better.failuresTolerated)}`,
+  })
+
+  const details = [
+    size === 1
+      ? 'With a single copy every failed OSD loses data: there is nothing to recover from.'
+      : `With 2 copies a failed ${one} leaves a single copy until recovery is done, and another failure in that ` +
+        `time loses data.` +
+        (scheme.minSize === 1 ? ' With min_size 1 the pool even accepts writes on that last copy.' : ''),
+    `Replication 3x, Ceph's default, keeps the data when up to 2 ${plural(domain)} fail and keeps serving I/O with ` +
+      `one failed.`,
+  ]
+  if (added > 0) {
+    const reserveText = reserve > 0 ? ` plus ${reserve} for the recovery reserve` : ''
+    const how = !basic
+      ? ' Add them in step 1; then switching to 3 copies is one click here.'
+      : perHost > 0
+        ? ` Adopting adds ${perHost} ${plural('osd', perHost)} to every host.`
+        : ` Adopting sets step 1 to ${formatInt(count + added)} hosts.`
+    const sizes =
+      input.groups.length > 1
+        ? ` The capacity assumes they are like most existing ones (${formatCapacity(typicalTB)}).`
+        : ''
+    details.push(
+      `3 copies need 3 ${plural(domain)}${reserveText}; there ${count === 1 ? 'is' : 'are'} ${formatInt(count)}, so ` +
+        `${formatInt(added)} more ${plural(domain, added)} ${added === 1 ? 'is' : 'are'} needed.${how}${sizes}`,
+    )
+  }
+  const delta = better.usableTB - result.usableTB
+  const capacity =
+    Math.abs(delta) <= result.usableTB * 0.005
+      ? 'The real net capacity stays about the same.'
+      : delta < 0
+        ? `It costs ${formatCapacity(-delta)} of real net capacity.`
+        : `The added ${plural(domain)} give ${formatCapacity(delta)} more real net capacity.`
+  details.push(size === 1 ? `${capacity} Keep size 1 only for data you can recreate.` : capacity)
+
+  // Adopting can add hardware only on the Basic tab.
+  const adopt: Recommendation['adopt'] =
+    added === 0
+      ? { summary: 'replication 3x', setup: { scheme: { ...target } } }
+      : !basic
+        ? undefined
+        : perHost > 0
+          ? {
+              summary: `replication 3x with ${basic.osdsPerHost + perHost} OSDs per host`,
+              setup: { scheme: { ...target }, basic: { osdsPerHost: basic.osdsPerHost + perHost } },
+            }
+          : {
+              summary: `replication 3x with ${formatInt(count + added)} hosts`,
+              setup: { scheme: { ...target }, basic: { hosts: basic.hosts + added } },
+            }
   return {
     id: 'replication',
-    // A single copy loses data with any failed OSD.
-    severity: 'critical',
-    title: `Keep ${size} copies instead of 1`,
-    changes: [
-      {
-        parameter: 'pool layout (step 2)',
-        from: 'size 1',
-        fromNote: `${formatCapacity(result.usableTB)} real net capacity, survives no failure`,
-        to: `size ${size}`,
-        toNote:
-          `${formatCapacity(better.usableTB)} real net capacity, survives ${better.failuresTolerated} failed ` +
-          plural(domain, better.failuresTolerated),
-      },
-    ],
-    details: [
-      'With a single copy every failed OSD loses data: there is nothing to recover from.',
-      size === 3
-        ? `Replication 3x, Ceph's default, keeps the data when up to 2 ${domains} fail and keeps serving I/O with one failed.`
-        : `Replication 2x keeps the data when a ${plural(domain, 1)} fails. With 3 ${domains} or more, 3 copies are safer.`,
-      `It costs ${formatCapacity(result.usableTB - better.usableTB)} of real net capacity. Keep size 1 only for data ` +
-        `you can recreate.`,
-    ],
-    adopt: { summary: `replication ${size}x`, setup: { scheme: { ...target } } },
+    // A single copy loses data with any failed OSD; size 2 with min_size 1 writes on a single copy.
+    severity: size === 1 || scheme.minSize === 1 ? 'critical' : 'info',
+    title:
+      added > 0
+        ? `Add ${formatInt(added)} ${plural(domain, added)} and keep 3 copies instead of ${size}`
+        : `Keep 3 copies instead of ${size}`,
+    changes,
+    details,
+    ...(adopt ? { adopt } : {}),
   }
 }
 

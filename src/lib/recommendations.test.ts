@@ -101,16 +101,89 @@ describe('adoptable recommendations', () => {
     expect(ids(recs(hosts(5), size1, { ...ratios, recoveryReserve: 0 }))).not.toContain('recovery-reserve')
   })
 
-  it('recommends 3 copies instead of 1, or 2 when only 2 domains exist', () => {
+  it('recommends 3 copies instead of 1', () => {
     const three = recs(hosts(5), size1, { ...ratios, recoveryReserve: 0 })[0]
     expect(three.title).toBe('Keep 3 copies instead of 1')
     expect(three.severity).toBe('critical')
     expect(three.adopt).toEqual({ summary: 'replication 3x', setup: { scheme: rep3 } })
+    expect(three.changes).toHaveLength(1)
+    expect(three.changes[0]).toMatchObject({ from: 'size 1', to: 'size 3' })
+    expect(three.changes[0].fromNote).toContain('survives no failure')
     expect(three.changes[0].toNote).toContain('survives 2 failed hosts')
-    const two = recs(hosts(2), size1, { ...ratios, recoveryReserve: 0 })[0]
-    expect(two.adopt?.setup.scheme).toEqual({ kind: 'replicated', size: 2, minSize: 1 })
-    // a single host offers no second domain: only the Ceph settings for size 1 remain
-    expect(ids(recs(hosts(1), size1, { ...ratios, recoveryReserve: 0 }))).toEqual(['single-copy'])
+    expect(three.details.join(' ')).toContain('Keep size 1 only for data you can recreate')
+  })
+})
+
+describe('replication recommendation for size 2', () => {
+  const none = { ...ratios, recoveryReserve: 0 }
+  const size2 = (minSize: number): Scheme => ({ kind: 'replicated', size: 2, minSize })
+  const basic = (n: number, osdsPerHost = 8) => ({ hosts: n, osdsPerHost, osdSizeTB: 8 })
+  const find = (list: { id: string }[]) => list.find((r) => r.id === 'replication') as ReturnType<typeof recs>[number]
+  const rec = (input: CapacityInput, scheme: Scheme, tunables: Tunables, extra: object = {}, domain: DomainType = 'host') =>
+    find(recommendations({ input, result: computeCapacity(input, scheme, tunables), tunables, scheme, domain, ...extra }))
+
+  it('recommends 3 copies when the hosts allow it; critical only with min_size 1', () => {
+    const safe = rec(hosts(5), size2(2), none)
+    expect(safe.title).toBe('Keep 3 copies instead of 2')
+    expect(safe.severity).toBe('info')
+    expect(safe.adopt).toEqual({ summary: 'replication 3x', setup: { scheme: rep3 } })
+    expect(safe.changes[0]).toMatchObject({ from: 'size 2', to: 'size 3' })
+    expect(safe.changes[0].fromNote).toContain('survives 1 failed host')
+    // 5 × 64 TB × 0.85: ÷ 2 = 136 TB, ÷ 3 = 90.7 TB
+    expect(safe.details.at(-1)).toBe('It costs 45.3 TB of real net capacity.')
+    const risky = rec(hosts(5), size2(1), none)
+    expect(risky.severity).toBe('critical')
+    expect(risky.details[0]).toContain('With min_size 1 the pool even accepts writes on that last copy.')
+  })
+
+  it('adds the missing hosts on the Basic tab', () => {
+    const two = rec(hosts(2), size2(1), none, { basic: basic(2) })
+    expect(two.title).toBe('Add 1 host and keep 3 copies instead of 2')
+    expect(two.changes.map((c) => c.parameter)).toEqual(['hosts (step 1)', 'pool layout (step 2)'])
+    expect(two.changes[0]).toEqual({
+      parameter: 'hosts (step 1)',
+      from: '2',
+      to: '3',
+      toNote: 'like the existing ones (64 TB)',
+    })
+    expect(two.adopt).toEqual({ summary: 'replication 3x with 3 hosts', setup: { scheme: rep3, basic: { hosts: 3 } } })
+    // calculated with the 3 hosts: 3 × 64 TB × 0.85 ÷ 3
+    expect(two.changes[1].toNote).toBe('54.4 TB real net capacity, survives 2 failed hosts')
+    expect(two.details.join(' ')).toContain('Adopting sets step 1 to 3 hosts.')
+    // size 1 on a single host needs two more
+    const size1: Scheme = { kind: 'replicated', size: 1, minSize: 1 }
+    expect(rec(hosts(1), size1, none, { basic: basic(1) }).title).toBe('Add 2 hosts and keep 3 copies instead of 1')
+  })
+
+  it('counts the recovery reserve', () => {
+    // 3 copies + 1 reserve need 4 hosts
+    const r = rec(hosts(3), size2(2), { ...ratios, recoveryReserve: 1 }, { basic: basic(3) })
+    expect(r.title).toBe('Add 1 host and keep 3 copies instead of 2')
+    expect(r.details.join(' ')).toContain('3 copies need 3 hosts plus 1 for the recovery reserve; there are 3')
+  })
+
+  it('only describes the change on the Advanced tab, with domains of the most common size', () => {
+    const input: CapacityInput = { groups: [{ capTB: 40, mult: 1 }, { capTB: 20, mult: 1 }], unplacedTB: 0 }
+    const r = rec(input, size2(2), none, {}, 'rack')
+    expect(r.title).toBe('Add 1 rack and keep 3 copies instead of 2')
+    expect(r.adopt).toBeUndefined()
+    expect(r.changes[0]).toMatchObject({ parameter: 'racks (step 1)', from: '2', to: '3', toNote: 'like the existing ones (40 TB)' })
+    const text = r.details.join(' ')
+    expect(text).toContain('Add them in step 1; then switching to 3 copies is one click here.')
+    expect(text).toContain('The capacity assumes they are like most existing ones (40 TB).')
+  })
+
+  it('adds OSDs to every host when spreading across OSDs on the Basic tab', () => {
+    const input = failureDomains(buildBasicTopology({ hosts: 1, osdsPerHost: 2, osdSizeTB: 8 }), 'osd')
+    const r = rec(input, size2(2), none, { basic: basic(1, 2) }, 'osd')
+    expect(r.title).toBe('Add 1 OSD and keep 3 copies instead of 2')
+    expect(r.changes[0]).toMatchObject({ parameter: 'OSDs per host (step 1)', from: '2', to: '3' })
+    expect(r.adopt?.setup).toEqual({ scheme: rep3, basic: { osdsPerHost: 3 } })
+  })
+
+  it('is only for replication below 3 copies', () => {
+    expect(find(recs(hosts(5), rep3, none))).toBeUndefined()
+    expect(find(recs(hosts(8), { kind: 'ec', k: 4, m: 2 }, none))).toBeUndefined()
   })
 
   it('keeps the applied recommendations applicable', () => {

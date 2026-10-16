@@ -263,6 +263,8 @@ const recommendationList = computed(() =>
     iops: iops.value,
     osdCount: poolStats.value.counts.osd,
     pgTargetPerOsd: state.pgTargetPerOsd,
+    // Recommendations can add hosts only on the Basic tab.
+    basic: state.tab === 'basic' ? state.basic : undefined,
   }),
 )
 
@@ -272,6 +274,7 @@ function adoptRecommendation(setup: SetupChange) {
   if (setup.scheme) state.scheme = { ...setup.scheme }
   if (setup.failureDomain) state.failureDomain = setup.failureDomain
   if (setup.pool) Object.assign(state.pool, setup.pool)
+  if (setup.basic) Object.assign(state.basic, setup.basic)
 }
 
 // Effective capacity when the pool compresses data (only with compression enabled).
