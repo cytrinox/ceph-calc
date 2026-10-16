@@ -10,8 +10,6 @@ import { distributionSegments } from '@/lib/distribution'
 
 const props = defineProps<{ result: CapacityResult; domain: DomainType; recoveryReserve: number }>()
 
-const share = (tb: number) => (props.result.rawTB > 0 ? tb / props.result.rawTB : 0)
-
 const segments = computed(() => distributionSegments(props.result))
 
 // The unusable block only appears when there is unusable space (balanced clusters have none).
@@ -60,7 +58,7 @@ const breakdowns = computed(() => {
         <span class="swatch" />
         <span class="label">{{ s.label }}</span>
         <span class="value">{{ formatCapacity(s.tb) }}</span>
-        <span class="note">{{ formatPct(share(s.tb)) }} · {{ s.note }}</span>
+        <span class="note">{{ s.pct }} · {{ s.note }}</span>
         <ul v-if="s.key === 'usable' && untilLimits.length" class="until">
           <li v-for="u in untilLimits" :key="u.key" :title="u.title">
             <RatioMarker :kind="u.key" :size="9" />

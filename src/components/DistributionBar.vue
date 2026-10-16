@@ -1,7 +1,6 @@
 <script setup lang="ts">
 import { computed } from 'vue'
 import RatioMarker, { type RatioKind } from './RatioMarker.vue'
-import { formatPct } from '@/lib/format'
 import { formatCapacity } from '@/lib/units'
 import { distributionSegments } from '@/lib/distribution'
 import type { CapacityResult } from '@/lib/ceph'
@@ -89,9 +88,9 @@ const markers = computed(() => {
           :key="s.key"
           :class="['seg', s.key]"
           :style="{ width: `${share(s.tb) * 100}%` }"
-          :title="`${s.label}: ${formatCapacity(s.tb)} (${formatPct(share(s.tb))})`"
+          :title="`${s.label}: ${formatCapacity(s.tb)} (${s.pct})`"
         >
-          <span v-if="share(s.tb) >= 0.1" class="pct">{{ formatPct(share(s.tb)) }}</span>
+          <span v-if="share(s.tb) >= 0.1" class="pct">{{ s.pct }}</span>
         </div>
       </div>
     </div>

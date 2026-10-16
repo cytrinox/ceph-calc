@@ -16,8 +16,24 @@ export function formatTB(tb: number): string {
 
 export function formatPct(fraction: number): string {
   if (!Number.isFinite(fraction)) return '—'
-  const pct = fraction * 100
-  return `${pct > 0 && pct < 1 ? pct.toFixed(1) : Math.round(pct)}%`
+  return `${shownPct(fraction * 100)}%`
+}
+
+/** The number formatPct shows: whole percent, one decimal below 1%. */
+function shownPct(pct: number): number {
+  return pct > 0 && pct < 1 ? Number(pct.toFixed(1)) : Math.round(pct)
+}
+
+/**
+ * Parts of a whole as percentages, like formatPct, but with one decimal for every part when the whole percents
+ * wouldn't add up to 100 (42.5 + 42.5 + 15 shows as 43 + 43 + 15). A trailing ".0" is left out: 15%, not 15.0%.
+ */
+export function formatShares(fractions: number[]): string[] {
+  const pcts = fractions.map((f) => (Number.isFinite(f) ? f * 100 : 0))
+  const whole = pcts.map(shownPct)
+  const total = whole.reduce((a, b) => a + b, 0)
+  const addsUp = Math.abs(total - 100) < 1e-6 || total === 0
+  return pcts.map((pct, i) => `${addsUp ? whole[i] : Number(pct.toFixed(1))}%`)
 }
 
 const intFormat = new Intl.NumberFormat('en-US')

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { formatIops, formatTB, formatTiB } from './format'
+import { formatIops, formatShares, formatTB, formatTiB } from './format'
 import { parseDecimal, snapStep } from './stepping'
 
 describe('formatTB', () => {
@@ -20,6 +20,24 @@ describe('formatTiB', () => {
     expect(formatTiB(9070)).toBe('8.06 PiB')
     expect(formatTiB(0.001)).toBe('0.931 GiB')
     expect(formatTiB(0)).toBe('0 TiB')
+  })
+})
+
+describe('formatShares', () => {
+  it('shows whole percents while they add up to 100', () => {
+    expect(formatShares([0.5, 0.3, 0.2])).toEqual(['50%', '30%', '20%'])
+    expect(formatShares([0.6, 0.4, 0])).toEqual(['60%', '40%', '0%'])
+    // parts below 1% keep formatPct's decimal: 0.5 + 0.5 + 99 = 100
+    expect(formatShares([0.005, 0.005, 0.99])).toEqual(['0.5%', '0.5%', '99%'])
+  })
+
+  it('switches every part to one decimal when the whole percents would not add up', () => {
+    // 43 + 43 + 15 = 101
+    expect(formatShares([0.425, 0.425, 0.15, 0])).toEqual(['42.5%', '42.5%', '15%', '0%'])
+    // 33 × 3 = 99
+    expect(formatShares([1 / 3, 1 / 3, 1 / 3])).toEqual(['33.3%', '33.3%', '33.3%'])
+    // 0.4 + 70 + 30 = 100.4
+    expect(formatShares([0.004, 0.7, 0.296])).toEqual(['0.4%', '70%', '29.6%'])
   })
 })
 
