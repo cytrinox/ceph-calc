@@ -5,8 +5,13 @@ order: 0
 author: Daniel Vogelbacher (cytrinox)
 author-link: https://www.chaospixel.com
 published: 2026-10-14
-revised: 2026-10-15
+revised: 2026-10-17
 ---
+
+## v0.4.0 · 17 October 2026
+
+- Show bar percentages with one decimal when whole ones don't add up
+- Recommend 3 copies for replication size 1 and 2, with the hosts to add
 
 ## v0.3.0 · 15 October 2026
 
